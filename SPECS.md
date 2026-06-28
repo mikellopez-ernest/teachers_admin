@@ -174,3 +174,11 @@ Expected server-side functions:
 - Action buttons warn when no row is selected.
 - Phase two edit scope is DB columns A through N.
 - Phase two export format is CSV; the visible option is `Full de càlcul`.
+
+## Repository Security
+
+- `.clasp.json` must not be committed to public GitHub repositories.
+- `.clasp.json` contains the Apps Script project ID. It is not an OAuth secret, but exposing it unnecessarily reveals project metadata.
+- Local clasp credentials, such as `.clasprc.json` or `~/.clasprc.json`, must never be committed.
+- The repository `.gitignore` excludes `.clasp.json`, `.clasprc.json`, and `.DS_Store`.
+- If `.clasp.json` has already been committed, remove it from Git tracking with `git rm --cached .clasp.json` before the next commit.
