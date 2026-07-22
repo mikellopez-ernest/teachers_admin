@@ -4,14 +4,14 @@
 
 - **Tables registry**: spreadsheet whose ID is stored in the script property `Tables`.
 - **DB**: spreadsheet resolved from the Tables registry row where column A is `Dades de professors`; column B of that row contains the DB spreadsheet ID.
-- **Endpoint**: Apps Script web app endpoint that reads from DB and renders an HTML page.
+- **Endpoint**: Apps Script web app endpoint that reads from DB and renders a responsive Bootstrap HTML page.
 
 ## DB Resolution
 
 1. Read script property `Tables`.
 2. Open that spreadsheet by ID.
 3. Open sheet `tables`.
-4. Find the row where column A, trimmed, equals `Dades de professors`.
+4. Find the row where column A exactly equals `Dades de professors`.
 5. Read column B from that row.
 6. Open that spreadsheet by ID. This spreadsheet is **DB**.
 
@@ -21,6 +21,17 @@ The endpoint reads professor rows from DB sheet `Llista`.
 
 DB has a header row, so professor data starts at row 2.
 
+DB also contains a `leave_absence` sheet used to record leave-of-absence periods. Its columns are:
+
+| Column | Meaning |
+| --- | --- |
+| A | `row_id`: original row number in `Llista` |
+| B | `teacher_code`: absent teacher code from `Llista` column F (`REDUIT`) |
+| C | `substitute_code`: substitute teacher code from `Llista` column F (`REDUIT`) |
+| D | `start_date` |
+| E | `end_date` |
+| F | `comments` |
+
 Displayed table columns:
 
 | UI column | DB source |
@@ -29,26 +40,39 @@ Displayed table columns:
 | `DEPT.` | column B |
 | `NOM SENCER` | concat of columns C, D, and E using a single space |
 | `SITUACIO` | column G |
-| `DNI` | column H |
-| `TELF` | column I |
-| `CORREU` | column K |
-| `XTEC` | column J |
+| `JORNADA` | column H |
+| `DNI` | column I |
+| `TELF` | column J |
+| `CORREU` | column L |
+| `XTEC` | column K |
+
+Additional DB columns used by workflows:
+
+| Meaning | DB source |
+| --- | --- |
+| `REDUIT` | column F |
+| `SITUACIO` allowed values | `FUNC. DEF`, `FUNC. PERFIL`, `FUNC. SNS PLAÇA`, `INT`, `INT. PERF`, `LABORAL` |
+| `JORNADA` allowed values | `SENCERA`, `MITJA`, `REDUCCIÓ UN TERÇ` |
 
 Control/status columns:
 
 | Meaning | DB source |
 | --- | --- |
-| `BAIXA?` | column L |
-| `NO ACTIUS` | column N |
+| `NOUS` | column M |
+| `ACTIU` | column N |
+| `BAIXA?` | column O |
+| `SUBST?` | column P |
 
 ## Page Layout
 
 The HTML page contains:
 
 1. Filters above the table.
-2. Status checkboxes above the table.
+2. Bootstrap status matrix above the table.
 3. Data table with selectable rows.
-4. Action buttons below the table.
+4. Action buttons fixed at the bottom of the page.
+
+Rows with `SUBST?` true are shown with a slight green background. Rows with `BAIXA?` true are shown with a slight red background. If both conditions apply, the leave-of-absence red background takes precedence.
 
 ## Filters
 
@@ -70,23 +94,24 @@ The HTML page contains:
 
 - A button with text `RESET`.
 - It clears the department filter and the name filter.
-- It does not reset `BAIXA?` or `NO ACTIUS`.
+- It does not reset the status matrix.
 
-## Status Checkboxes
+## Status Matrix
 
-### `BAIXA?`
+The status filters are displayed as two rows: row 1 has `Actius`, `No actius`, and `Només nous`; row 2 has `No baixa` and `Baixa`. They are additive except `Només nous`, which is exclusive.
 
-- Default: deactivated.
-- When deactivated, show rows where DB column L is not true.
-- When activated, show only rows where DB column L is true.
-- True can be a real boolean `true` or the string `TRUE`, matched case-insensitively.
+| Row | Value 1 | Default | Value 2 | Default | Value 3 | Default |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `Actius` | checked | `No actius` | unchecked | `Només nous` | unchecked |
+| 2 | `No baixa` | checked | `Baixa` | unchecked | | |
 
-### `NO ACTIUS`
-
-- Default: deactivated.
-- DB column N is treated as active-state data.
-- When deactivated, show rows where DB column N is true.
-- When activated, show only rows where DB column N is not true.
+- `Actius` checked includes rows where DB column N is true.
+- `No actius` checked includes rows where DB column N is not true.
+- `No baixa` checked includes rows where DB column O is not true.
+- `Baixa` checked includes rows where DB column O is true.
+- `Només nous` checked restricts the result to rows where DB column M is true.
+- If none of the active-state boxes are checked, no active-state rows are shown.
+- If none of the baixa-state boxes are checked, no baixa-state rows are shown.
 - True can be a real boolean `true` or the string `TRUE`, matched case-insensitively.
 
 ## Sorting
@@ -107,9 +132,18 @@ The HTML page contains:
 
 ## Teacher Detail And Edit
 
-- Clicking `NOM SENCER` opens a small modal window with all teacher information from DB columns A through N.
+- Clicking the `NOM SENCER` hyperlink opens a small modal window with teacher information organized with Bootstrap.
+- Detail block 1 has two columns:
+  - Column 1: `NOM`, `COGNOM1`, `COGNOM2`.
+  - Column 2: `ESP`, `REDUIT`, `DEP`, `SITUACIO`, `JORNADA`.
+- Detail block 2 has two columns:
+  - Column 1: `DNI`, `TELF`, `CORREU`, `XTEC`.
+  - Column 2: `ACTIU`, `BAIXA`, `NOUS`, `SUBST?`, presented as boolean values.
 - The detail window has an `Edit` button.
-- Clicking `Edit` converts the detail window into a form.
+- Clicking `Edit` converts the detail window into a form with the same block and column structure.
+- In edit mode, `SITUACIO` and `JORNADA` are edited with fixed option controls.
+- In edit mode, `ACTIU`, `NOUS`, and `SUBST?` are editable checkboxes.
+- In edit mode, `BAIXA` is displayed as a disabled/read-only checkbox. It can only be changed by the `Donar de baixa` / `Donar d'alta` workflow.
 - The edit form has `Save` and `Cancel` buttons.
 - `Save` writes the edited values back to the same DB row.
 - `Cancel` returns to the read-only detail view without writing changes.
@@ -117,25 +151,92 @@ The HTML page contains:
 
 ## Action Buttons
 
-Buttons appear below the table and operate on selected rows.
+Buttons are fixed at the bottom of the page and operate on selected rows.
 
 If no rows are selected, clicking an action button shows a warning and does not update DB.
 
-### `Donar de baixa` / `Donar de alta`
+### `Donar de baixa` / `Donar d'alta`
 
-- Button text depends on the current `BAIXA?` checkbox:
-  - If `BAIXA?` is activated: `Donar de alta`.
-  - If `BAIXA?` is deactivated: `Donar de baixa`.
-- On click, update column L in DB for every selected row:
-  - `Donar de baixa` sets column L to boolean `true`.
-  - `Donar de alta` sets column L to boolean `false`.
+- The button is disabled when no teacher is selected.
+- The workflow only accepts one selected teacher. If more than one teacher is selected, show a warning and do not update DB.
+- If the selected teacher is not currently `BAIXA`, the button text is `Donar de baixa`.
+- If the selected teacher is currently `BAIXA`, the button text is `Donar d'alta`.
+
+#### Start Leave
+
+- Clicking `Donar de baixa` opens a modal asking for:
+  - start date, defaulting to today, using a Spanish datepicker with Monday as the first day of the week;
+  - substitute teacher, selected from teachers in `Llista` with a `REDUIT` code, where `BAIXA?` column O is not true and `SUBST?` column P is not true; the combo displays name and surnames, but the stored substitute code is `REDUIT` from column F;
+  - comments.
+- Confirming the modal sets `Llista` column O to boolean `true` for the selected absent teacher.
+- Confirming the modal sets `Llista` column P `SUBST?` to boolean `true` for the selected substitute teacher.
+- Confirming the modal sets `Llista` column N `ACTIU` to boolean `true` for the selected substitute teacher.
+- Confirming the modal appends a row to `leave_absence` with `row_id`, `teacher_code` from the absent teacher's `REDUIT` column F, `substitute_code` from the substitute teacher's `REDUIT` column F, `start_date`, blank `end_date`, and `comments`.
+- After DB writes are flushed, the app calls the schedule cache rebuild endpoint with POST action `rebuildScheduleCache`.
 - After updating, refresh the visible data.
+
+#### End Leave
+
+- Clicking `Donar d'alta` opens a confirmation modal asking for end date, defaulting to today, using a Spanish datepicker with Monday as the first day of the week.
+- Confirming the modal fills `end_date` in the latest open `leave_absence` row for that teacher.
+- Confirming the modal sets `Llista` column O `BAIXA?` to boolean `false` for the selected absent teacher. The open `leave_absence` record is the authority for ending a leave, so the action can recover if column O is not currently truthy.
+- Confirming the modal finds the recorded substitute by `leave_absence.substitute_code` and sets that substitute's `SUBST?` column P and `ACTIU` column N to boolean `false`.
+- After DB writes are flushed, the app calls the schedule cache rebuild endpoint with POST action `rebuildScheduleCache`.
+- After updating, refresh the visible data.
+
+#### Schedule Cache Rebuild Notification
+
+- The leave workflow must notify the Horaris cache rebuild web app after starting or ending a leave.
+- The default endpoint URL is `https://script.google.com/macros/s/AKfycbyhSqCTkS27bDxsfILI64rlSMUTN5A7VbHGgpSf_G6efxrWfOuUKJULnN2rlMtHuWqwmA/exec`.
+- The endpoint URL can be overridden with script property `cache_rebuild_url`.
+- The authorization token is read from script property `cache_rebuild_token`.
+- If `cache_rebuild_token` is not set in this project, the leave workflow reports an error.
+- The Apps Script manifest must include `https://www.googleapis.com/auth/script.external_request` so `UrlFetchApp` can call the Horaris endpoint.
+- The Horaris web app deployment must be reachable by `UrlFetchApp`; it should enforce authorization with `cache_rebuild_token` rather than requiring an interactive Google Sign-In page.
+- The app calls the endpoint with JSON POST:
+
+```js
+{
+  action: 'rebuildScheduleCache',
+  token: 'VALUE_FROM_cache_rebuild_token'
+}
+```
+
+- A response is accepted only when the HTTP status is 2xx and the parsed JSON response has `ok: true`.
+- Rebuild errors are surfaced to the user so stale schedule-cache problems are visible.
+- The app writes structured Apps Script logs for the notification flow:
+  - `scheduleCacheRebuild.notify.start`
+  - `scheduleCacheRebuild.notify.response`
+  - `scheduleCacheRebuild.notify.success`
+  - `scheduleCacheRebuild.notify.configError`
+  - `scheduleCacheRebuild.notify.fetchError`
+  - `scheduleCacheRebuild.notify.parseError`
+  - `scheduleCacheRebuild.notify.rebuildError`
+- Logs include the leave event, affected row numbers/codes, endpoint URL, whether a token is configured, HTTP status, and a truncated response body. Logs never include the token value.
+- The app also writes a persistent audit row in DB sheet `cache_rebuild_log` for each notification step.
+- If `cache_rebuild_log` does not exist, the app creates it.
+- `cache_rebuild_log` columns are:
+  - `timestamp`
+  - `event`
+  - `leave_event`
+  - `row_number`
+  - `teacher_code`
+  - `substitute_code`
+  - `leave_absence_row`
+  - `substitute_row_number`
+  - `endpoint_url`
+  - `has_token`
+  - `status_code`
+  - `ok`
+  - `response_text`
+  - `error`
+- The persistent log never stores the token value.
 
 ### `Desactivar` / `Activar`
 
-- Button text depends on the current `NO ACTIUS` checkbox:
-  - If `NO ACTIUS` is activated: `Activar`.
-  - If `NO ACTIUS` is deactivated: `Desactivar`.
+- Button text depends on the active-state matrix:
+  - If only `No actius` is checked: `Activar`.
+  - Otherwise: `Desactivar`.
 - On click, update column N in DB for every selected row:
   - `Desactivar` sets column N to boolean `false`.
   - `Activar` sets column N to boolean `true`.
@@ -148,7 +249,7 @@ If no rows are selected, clicking an action button shows a warning and does not 
 - If rows are selected, clicking it opens a small modal window with export options.
 - Phase two includes one export option: `Full de càlcul`, which downloads a spreadsheet-compatible CSV file.
 - Confirming the export downloads a CSV file containing the selected rows to the user's computer.
-- Exported data includes DB columns A through N and the header row.
+- Exported data includes DB columns A through P and the header row.
 - The app does not create any export file in Google Drive.
 
 ## Apps Script Functions
@@ -158,10 +259,13 @@ Expected server-side functions:
 - `doGet(e)`: returns the HTML page.
 - `getDbSpreadsheet_()`: resolves and opens DB.
 - `getProfessorsData()`: reads DB rows and returns data for the page.
-- `updateBaixa(rowNumbers, value)`: writes boolean values to DB column L.
+- `startLeaveAbsence(rowNumber, leaveData)`: starts a leave workflow, writes absent-teacher DB column O, writes substitute columns N and P, and appends a `leave_absence` row.
+- `endLeaveAbsence(rowNumber, leaveData)`: ends a leave workflow, writes absent-teacher DB column O, clears substitute columns N and P, and fills the open `leave_absence.end_date`.
+- `notifyScheduleCacheRebuild_()`: POSTs `action=rebuildScheduleCache` to the Horaris cache rebuild endpoint using script property `cache_rebuild_token`.
+- `getLeaveAbsenceSheet_()`: opens DB sheet `leave_absence` and ensures expected headers.
 - `updateActiu(rowNumbers, value)`: writes boolean values to DB column N.
-- `getTeacherDetails(rowNumber)`: reads all editable teacher fields from DB columns A through N.
-- `saveTeacherDetails(rowNumber, fields)`: writes edited teacher fields back to DB columns A through N.
+- `getTeacherDetails(rowNumber)`: reads all editable teacher fields from DB columns A through P.
+- `saveTeacherDetails(rowNumber, fields)`: writes edited teacher fields back to DB columns A through P.
 - `exportTeachers(rowNumbers)`: returns CSV data for selected teacher rows so the browser can download it.
 
 ## Decisions
@@ -169,10 +273,13 @@ Expected server-side functions:
 - Source sheet inside DB: `Llista`.
 - DB has a header row; data starts at row 2.
 - Status reads accept real booleans and string `TRUE`; status writes use real booleans.
-- DB column N is interpreted as active-state data, so `NO ACTIUS` is the inverse of column N.
+- DB column M is interpreted as `NOUS`.
+- DB column N is interpreted as active-state data; `No actius` shows the inverse of column N.
+- DB column O is interpreted as `BAIXA?`.
+- DB column P is interpreted as `SUBST?`.
 - `RESET` clears only the department and name filters.
 - Action buttons warn when no row is selected.
-- Phase two edit scope is DB columns A through N.
+- Phase two edit scope is DB columns A through P, except `BAIXA?` which is read-only in the edit form.
 - Phase two export format is CSV; the visible option is `Full de càlcul`.
 
 ## Repository Security
