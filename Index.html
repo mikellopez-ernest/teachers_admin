@@ -432,6 +432,14 @@
             <input type="radio" name="exportFormat" value="csv" checked>
             Full de càlcul
           </label>
+          <label class="export-option">
+            <input type="radio" name="exportFormat" value="signaturesPdf">
+            Llistat signatures
+          </label>
+          <label class="export-option">
+            <input type="radio" name="exportFormat" value="labelsPdf">
+            Etiquetes
+          </label>
           <div id="exportResult" class="message"></div>
         </div>
         <footer class="app-modal-actions">
@@ -452,6 +460,8 @@
       </section>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
     <script>
@@ -1198,9 +1208,22 @@
 
       function exportSelectedRows() {
         const rowNumbers = [...state.selectedRows];
+        const selectedFormat = document.querySelector('input[name="exportFormat"]:checked').value;
         elements.confirmExportButton.disabled = true;
         elements.exportResult.textContent = 'Exportant...';
         elements.exportResult.classList.remove('error');
+
+        if (selectedFormat === 'signaturesPdf') {
+          downloadSignatureListPdf();
+          elements.confirmExportButton.disabled = false;
+          return;
+        }
+
+        if (selectedFormat === 'labelsPdf') {
+          downloadLabelsPdf();
+          elements.confirmExportButton.disabled = false;
+          return;
+        }
 
         google.script.run
           .withSuccessHandler((result) => {
@@ -1215,6 +1238,183 @@
             elements.exportResult.classList.add('error');
           })
           .exportTeachers(rowNumbers);
+      }
+
+      function downloadSignatureListPdf() {
+        const selectedRows = getSelectedRowObjects();
+        if (!selectedRows.length) {
+          elements.exportResult.textContent = 'Cal seleccionar almenys una fila.';
+          elements.exportResult.classList.add('error');
+          return;
+        }
+
+        const PdfConstructor = window.jspdf && window.jspdf.jsPDF;
+        if (!PdfConstructor || typeof PdfConstructor !== 'function') {
+          elements.exportResult.textContent = "No s'ha pogut carregar el generador de PDF.";
+          elements.exportResult.classList.add('error');
+          return;
+        }
+
+        const rows = selectedRows
+          .filter((row) => row.fullName)
+          .sort((a, b) => compareRows(a, b, 'fullName'))
+          .map((row) => [row.fullName, '', '']);
+
+        if (!rows.length) {
+          elements.exportResult.textContent = 'No hi ha noms per generar el llistat.';
+          elements.exportResult.classList.add('error');
+          return;
+        }
+
+        const doc = new PdfConstructor({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4',
+        });
+        if (typeof doc.autoTable !== 'function') {
+          elements.exportResult.textContent = "No s'ha pogut carregar el generador de taules PDF.";
+          elements.exportResult.classList.add('error');
+          return;
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+        const fileName = 'llistat-professorat-signatures-' + today + '.pdf';
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const availableWidth = pageWidth - 24;
+
+        doc.setProperties({ title: 'Llistat professorat signatures' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        const widestName = rows.reduce((widest, row) => Math.max(widest, doc.getTextWidth(row[0])), 0);
+        const nameWidth = Math.min(Math.max(widestName + 6, 54), 92);
+        const signatureWidth = 54;
+        const observationsWidth = availableWidth - nameWidth - signatureWidth;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('Llistat professorat signatures', 12, 13);
+
+        doc.autoTable({
+          head: [['Professor/a', 'Signatura', 'Observacions']],
+          body: rows,
+          startY: 18,
+          margin: { top: 12, right: 12, bottom: 12, left: 12 },
+          theme: 'grid',
+          styles: {
+            font: 'helvetica',
+            fontSize: 9,
+            textColor: [0, 0, 0],
+            lineColor: [0, 0, 0],
+            lineWidth: 0.15,
+            cellPadding: { top: 2, right: 2, bottom: 2, left: 2 },
+            minCellHeight: 15.2,
+            halign: 'left',
+            valign: 'middle',
+            overflow: 'linebreak',
+          },
+          headStyles: {
+            fillColor: [255, 255, 255],
+            textColor: [0, 0, 0],
+            fontStyle: 'bold',
+            minCellHeight: 8,
+          },
+          columnStyles: {
+            0: { cellWidth: nameWidth },
+            1: { cellWidth: signatureWidth },
+            2: { cellWidth: observationsWidth },
+          },
+          rowPageBreak: 'avoid',
+          didDrawPage: () => {
+            const pageInfo = doc.internal.getCurrentPageInfo();
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.text('Pàgina ' + pageInfo.pageNumber, 198, 288, { align: 'right' });
+          },
+        });
+
+        doc.save(fileName);
+        elements.exportResult.textContent = 'Descarregat: ' + fileName;
+      }
+
+      function downloadLabelsPdf() {
+        const selectedRows = getSelectedRowObjects();
+        if (!selectedRows.length) {
+          elements.exportResult.textContent = 'Cal seleccionar almenys una fila.';
+          elements.exportResult.classList.add('error');
+          return;
+        }
+
+        const PdfConstructor = window.jspdf && window.jspdf.jsPDF;
+        if (!PdfConstructor || typeof PdfConstructor !== 'function') {
+          elements.exportResult.textContent = "No s'ha pogut carregar el generador de PDF.";
+          elements.exportResult.classList.add('error');
+          return;
+        }
+
+        const names = selectedRows
+          .filter((row) => row.fullName)
+          .sort((a, b) => compareRows(a, b, 'fullName'))
+          .map((row) => row.fullName);
+
+        if (!names.length) {
+          elements.exportResult.textContent = 'No hi ha noms per generar les etiquetes.';
+          elements.exportResult.classList.add('error');
+          return;
+        }
+
+        const doc = new PdfConstructor({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4',
+        });
+        if (typeof doc.autoTable !== 'function') {
+          elements.exportResult.textContent = "No s'ha pogut carregar el generador de taules PDF.";
+          elements.exportResult.classList.add('error');
+          return;
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+        const fileName = 'etiquetes-professorat-' + today + '.pdf';
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = { top: 10, right: 10, bottom: 10, left: 10 };
+        const cellWidth = (pageWidth - margin.left - margin.right) / 2;
+        const cellHeight = (pageHeight - margin.top - margin.bottom) / 15;
+        const rows = [];
+
+        for (let index = 0; index < names.length; index += 2) {
+          rows.push([names[index] || '', names[index + 1] || '']);
+        }
+
+        doc.setProperties({ title: 'Etiquetes professorat' });
+        doc.autoTable({
+          body: rows,
+          startY: margin.top,
+          margin,
+          theme: 'grid',
+          styles: {
+            font: 'helvetica',
+            fontSize: 10,
+            fontStyle: 'bold',
+            textColor: [0, 0, 0],
+            lineColor: [0, 0, 0],
+            lineWidth: 0.15,
+            cellPadding: { top: 1, right: 3, bottom: 1, left: 3 },
+            minCellHeight: cellHeight,
+            halign: 'center',
+            valign: 'middle',
+            overflow: 'linebreak',
+          },
+          columnStyles: {
+            0: { cellWidth },
+            1: { cellWidth },
+          },
+          pageBreak: 'auto',
+          rowPageBreak: 'avoid',
+        });
+
+        doc.save(fileName);
+        elements.exportResult.textContent = 'Descarregat: ' + fileName;
       }
 
       function downloadTextFile(file) {

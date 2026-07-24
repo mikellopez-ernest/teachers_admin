@@ -247,10 +247,35 @@ If no rows are selected, clicking an action button shows a warning and does not 
 - Button appears next to `Desactivar` / `Activar`.
 - If no rows are selected, clicking it shows a warning and does not continue.
 - If rows are selected, clicking it opens a small modal window with export options.
-- Phase two includes one export option: `Full de càlcul`, which downloads a spreadsheet-compatible CSV file.
-- Confirming the export downloads a CSV file containing the selected rows to the user's computer.
-- Exported data includes DB columns A through P and the header row.
+- Export option `Full de càlcul` downloads a spreadsheet-compatible CSV file containing selected rows.
+- Export option `Llistat signatures` downloads a PDF containing selected rows.
+- Export option `Etiquetes` downloads a PDF sticker sheet containing selected rows.
+- CSV exported data includes DB columns A through P and the header row.
 - The app does not create any export file in Google Drive.
+
+#### `Llistat signatures` PDF
+
+- The PDF contains only selected teachers.
+- Teacher names are sorted alphabetically by first surname, using the same sort key as `NOM SENCER`.
+- The PDF contains a table with three columns:
+  - column 1: teacher full name from DB columns C, D, and E;
+  - column 2: blank signing space;
+  - column 3: `Observacions`.
+- Column 1 is sized from the widest selected teacher name, with a cap so column 3 has more usable width.
+- Rows are tall enough to fit 17 teachers per page.
+- Cell text is vertically centered and horizontally left-aligned.
+- The PDF is generated in the browser and downloaded to the user's computer.
+
+#### `Etiquetes` PDF
+
+- The PDF contains only selected teachers.
+- Teacher names are sorted alphabetically by first surname, using the same sort key as `NOM SENCER`.
+- The PDF contains a table with 2 columns and 15 rows per page.
+- The PDF has no header row and no title text.
+- Each cell contains one teacher full name from DB columns C, D, and E.
+- Teacher names are horizontally and vertically centered in each cell.
+- Blank cells are allowed on the final page when the selected-teacher count is odd.
+- The PDF is generated in the browser and downloaded to the user's computer.
 
 ## Apps Script Functions
 
@@ -268,6 +293,11 @@ Expected server-side functions:
 - `saveTeacherDetails(rowNumber, fields)`: writes edited teacher fields back to DB columns A through P.
 - `exportTeachers(rowNumbers)`: returns CSV data for selected teacher rows so the browser can download it.
 
+Expected client-side export functions:
+
+- `downloadSignatureListPdf()`: generates the selected-teacher signature PDF in the browser.
+- `downloadLabelsPdf()`: generates the selected-teacher label PDF in the browser.
+
 ## Decisions
 
 - Source sheet inside DB: `Llista`.
@@ -280,7 +310,7 @@ Expected server-side functions:
 - `RESET` clears only the department and name filters.
 - Action buttons warn when no row is selected.
 - Phase two edit scope is DB columns A through P, except `BAIXA?` which is read-only in the edit form.
-- Phase two export format is CSV; the visible option is `Full de càlcul`.
+- Export formats are selected from the `Exportar` modal: `Full de càlcul` CSV, `Llistat signatures` PDF, and `Etiquetes` PDF.
 
 ## Repository Security
 

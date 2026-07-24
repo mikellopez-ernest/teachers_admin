@@ -1,3 +1,27 @@
 .clasp.json
 .clasprc.json
 .DS_Store
+# Apps Script / clasp local credentials
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.local
+*secret*
+*secrets*
+*credential*
+*credentials*
+service-account*.json
+*service_account*.json
+
+# OS/editor noise
+.idea/
+.vscode/
+
+# Dependencies/build output
+node_modules/
+dist/
+build/
+.tmp/
+tmp/

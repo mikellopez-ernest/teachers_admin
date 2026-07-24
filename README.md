@@ -54,7 +54,9 @@ The DB spreadsheet also has a `leave_absence` sheet with `row_id`, `teacher_code
 - `Donar de baixa` / `Donar d'alta` manages one selected teacher at a time, updates absent-teacher column O, records dates/substitute/comments in `leave_absence`, marks the substitute with `SUBST?` and `ACTIU`, and clears those substitute flags when the leave ends.
 - Starting or ending a leave calls the Horaris schedule cache rebuild endpoint with JSON POST `action=rebuildScheduleCache`.
 - `Desactivar` / `Activar` updates column N.
-- `Exportar` downloads a spreadsheet-compatible CSV file from selected rows.
+- `Exportar` opens export options for selected rows: spreadsheet-compatible CSV, a browser-generated PDF signature list, or PDF teacher stickers.
+- The signature list includes only selected teachers, sorted by first surname, with columns for teacher name, signature, and observations.
+- `Etiquetes` creates a selected-teacher PDF with two columns and fifteen rows per page, with each teacher name centered in its cell.
 - Rows with `SUBST?` checked are shown in slight green; leave-of-absence rows are shown in slight red.
 - Action buttons warn if no row is selected.
 - `BAIXA?` is read-only in the teacher edit form and is only changed through the leave workflow.
@@ -62,6 +64,8 @@ The DB spreadsheet also has a `leave_absence` sheet with `row_id`, `teacher_code
 ## Local Development
 
 This project is connected to Apps Script with `clasp`.
+
+The PDF exports are generated in the browser with jsPDF and jsPDF AutoTable loaded from CDN by `Index.html`.
 
 ## Script Properties
 
