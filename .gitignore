@@ -1,12 +1,16 @@
+# Apps Script / clasp local credentials
 .clasp.json
 .clasprc.json
-.DS_Store
-# Apps Script / clasp local credentials
+**/.clasp.json
+**/.clasprc.json
 
 # Local environment and secrets
 .env
 .env.*
+**/.env
+**/.env.*
 !.env.example
+!**/.env.example
 *.local
 *secret*
 *secrets*
@@ -14,14 +18,37 @@
 *credentials*
 service-account*.json
 *service_account*.json
+**/service-account*.json
+**/*service_account*.json
+
+# Google/API key material
+client_secret*.json
+oauth*.json
+token*.json
+**/client_secret*.json
+**/oauth*.json
+**/token*.json
+.git-credentials
+.netrc
+.npmrc
+**/.npmrc
 
 # OS/editor noise
+.DS_Store
+**/.DS_Store
 .idea/
 .vscode/
+**/.idea/
+**/.vscode/
 
 # Dependencies/build output
 node_modules/
+**/node_modules/
 dist/
 build/
 .tmp/
 tmp/
+**/dist/
+**/build/
+**/.tmp/
+**/tmp/
