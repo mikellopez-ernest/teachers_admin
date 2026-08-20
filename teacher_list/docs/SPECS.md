@@ -125,7 +125,7 @@ When a class is selected:
 5. Scan columns M onward.
 6. If an allocation cell is numeric and greater than 0, row 2 of that column is the teacher for that subject.
 7. Collapse duplicate teacher/subject pairs using key `teacherName + "::" + subject`.
-8. Sort by teacher name, then subject.
+8. Keep result order from `distribucio`: lesson rows are read top-to-bottom, and teacher allocations are scanned from column M onward.
 
 Display:
 

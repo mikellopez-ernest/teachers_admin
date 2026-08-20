@@ -132,7 +132,7 @@ function getTeachersForClass(classLabel) {
     }
   });
 
-  return results.sort((a, b) => compareText_(a.teacherName, b.teacherName) || compareText_(a.subject, b.subject));
+  return results;
 }
 
 function createTeacherListXlsx(filters) {
