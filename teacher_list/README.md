@@ -37,13 +37,13 @@ Only rows where `ACTIU` column N is true are shown.
 
 The `Per classe` view reads script property `db` as the registry spreadsheet ID, finds `Càrrega lectiva` in `tables`, and opens its `distribucio` sheet.
 
-It builds a class combo from `Curs` and `Grup`, expands comma-separated groups and `TOTS`, and displays unique teacher/subject pairs for the selected class. Teacher order follows the order in `distribucio`.
+It builds a class combo from `Curs` and `Grup`, expands comma-separated groups and `TOTS`, and displays unique teacher/subject pairs for the selected class. Teacher order follows the order in `distribucio`. It enriches teachers with `CORREU INSTIT` by matching `distribucio` row 2 teacher names against `Càrrega lectiva -> professors` column Q and reading email from column L.
 
 The view is strictly read-only.
 
 ## XLSX Export
 
-The bottom-right floating export button uses Bootstrap Icon `bi-file-earmark-spreadsheet` and exports the current filtered list to XLSX.
+The bottom-right floating export button uses Bootstrap Icon `bi-file-earmark-spreadsheet`. It exports the current filtered teacher list on `Llistat`, and the selected class teacher/subject/email table on `Per classe`.
 
 The backend creates a temporary Google Spreadsheet, writes the list into it, exports it through the Drive XLSX export endpoint, returns the file as base64 to the browser, and trashes the temporary spreadsheet in a `finally` block.
 

@@ -82,7 +82,7 @@ Data source for this section:
 - In registry sheet `tables`, find row where column A is exactly `Càrrega lectiva`.
 - Use column B from that row as the Càrrega lectiva spreadsheet ID.
 - Open sheet `distribucio` in that spreadsheet.
-- Do not read any other sheet for this section.
+- Open sheet `professors` in the same `Càrrega lectiva` spreadsheet for teacher email enrichment.
 - Do not write anything.
 
 Expected `distribucio` structure:
@@ -94,6 +94,13 @@ Expected `distribucio` structure:
 - group: column B;
 - subject: column C;
 - teacher allocation cells: columns M onward.
+
+Expected `professors` structure in `Càrrega lectiva`:
+
+- `CORREU INSTIT`: column L;
+- teacher lookup key/name: column Q.
+
+The teacher names from `distribucio` row 2 are matched against `professors` column Q to add `CORREU INSTIT` from column L.
 
 Class combo generation:
 
@@ -130,13 +137,13 @@ When a class is selected:
 Display:
 
 - combo box with all classes/groups;
-- results table with columns `Teacher` and `Subject`;
+- results table with columns `Teacher`, `Subject`, and `CORREU INSTIT`;
 - if no class is selected, show no results;
 - if a class has no rows, show `No teachers found for this class.`.
 
 Read-only rule:
 
-- allowed: read script property `db`, open registry spreadsheet, open `Càrrega lectiva`, read `distribucio`, render UI;
+- allowed: read script property `db`, open registry spreadsheet, open `Càrrega lectiva`, read `distribucio`, read `professors`, render UI;
 - forbidden: writing cell values, clearing cells, modifying sheets, creating sheets, editing properties.
 
 ## `Estructura` View
@@ -150,7 +157,8 @@ The floating bottom-right export button:
 
 - is visible on `Llistat`;
 - uses Bootstrap Icons class `bi-file-earmark-spreadsheet`;
-- exports the current filtered list to XLSX format.
+- exports the current filtered list to XLSX format on `Llistat`;
+- exports the selected class teacher/subject/email table to XLSX format on `Per classe`.
 
 Export process:
 
@@ -192,8 +200,9 @@ Expected server-side functions:
 - `grantRequiredPermissions()`: helper to trigger all needed authorization scopes.
 - `getTeacherListData()`: returns active teachers and department options for the browser.
 - `getClassOptions()`: returns class labels from `distribucio`.
-- `getTeachersForClass(classLabel)`: returns teacher/subject rows for the selected class.
+- `getTeachersForClass(classLabel)`: returns teacher/subject/email rows for the selected class.
 - `createTeacherListXlsx(filters)`: exports the current filtered list as XLSX.
+- `createClassTeachersXlsx(classLabel)`: exports the selected class teacher/subject/email table as XLSX.
 - `getTeacherDbSpreadsheet_()`: resolves and opens DB.
 - `getTeacherDbSheet_()`: opens DB sheet `Llista`.
 

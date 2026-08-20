@@ -5,6 +5,7 @@ const CONFIG = {
   workloadDbName: 'Càrrega lectiva',
   teacherDbSheetName: 'Llista',
   distribucioSheetName: 'distribucio',
+  workloadProfessorsSheetName: 'professors',
   xlsxMimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
 
@@ -22,6 +23,11 @@ const DISTRIBUCIO_COLUMNS = {
   group: 2,
   subject: 3,
   firstTeacher: 13,
+};
+
+const WORKLOAD_PROFESSORS_COLUMNS = {
+  correuInstit: 12,
+  teacherKey: 17,
 };
 
 const KNOWN_GROUPS = {
@@ -54,6 +60,8 @@ function grantRequiredPermissions() {
   sheet.getRange(1, 1).getValue();
   const distribucioSheet = getDistribucioSheet_();
   distribucioSheet.getRange(1, 1).getValue();
+  const workloadProfessorsSheet = getWorkloadProfessorsSheet_();
+  workloadProfessorsSheet.getRange(1, 1).getValue();
 
   const tempSpreadsheet = SpreadsheetApp.create('teacher_list_permission_check');
   const tempFile = DriveApp.getFileById(tempSpreadsheet.getId());
@@ -70,6 +78,7 @@ function grantRequiredPermissions() {
       dbName: db.getName(),
       teacherSheetName: sheet.getName(),
       distribucioSheetName: distribucioSheet.getName(),
+      workloadProfessorsSheetName: workloadProfessorsSheet.getName(),
       exportStatus: response.getResponseCode(),
       message: 'Permisos concedits correctament.',
     };
@@ -108,6 +117,7 @@ function getTeachersForClass(classLabel) {
   const values = sheet.getDataRange().getValues();
   const headerRowIndex = findLessonHeaderRow_(values);
   const teacherNames = values[1] || [];
+  const emailByTeacher = getWorkloadTeacherEmailMap_();
   const results = [];
   const seen = new Set();
 
@@ -128,11 +138,48 @@ function getTeachersForClass(classLabel) {
       results.push({
         teacherName,
         subject,
+        correuInstit: emailByTeacher.get(normalizeText_(teacherName)) || '',
       });
     }
   });
 
   return results;
+}
+
+function createClassTeachersXlsx(classLabel) {
+  const parsedClass = parseClassLabel_(classLabel);
+  const rows = getTeachersForClass(classLabel);
+  const model = buildClassTeachersXlsxModel_(rows, parsedClass);
+  const fileName = buildClassTeachersFileName_(parsedClass);
+  const tempSpreadsheet = SpreadsheetApp.create(fileName.replace(/\.xlsx$/i, ''));
+  const tempFile = DriveApp.getFileById(tempSpreadsheet.getId());
+
+  try {
+    const sheet = tempSpreadsheet.getSheets()[0];
+    sheet.setName('Per classe');
+    applyTeacherListSheet_(sheet, model);
+    SpreadsheetApp.flush();
+
+    const response = UrlFetchApp.fetch(getXlsxExportUrl_(tempSpreadsheet.getId()), {
+      headers: {
+        Authorization: 'Bearer ' + ScriptApp.getOAuthToken(),
+      },
+      muteHttpExceptions: true,
+    });
+
+    if (response.getResponseCode() !== 200) {
+      throw new Error(`No s'ha pogut exportar el llistat XLSX (${response.getResponseCode()}).`);
+    }
+
+    return {
+      fileName,
+      mimeType: CONFIG.xlsxMimeType,
+      base64: Utilities.base64Encode(response.getBlob().getBytes()),
+      message: `S'ha exportat el llistat de ${classLabel}.`,
+    };
+  } finally {
+    tempFile.setTrashed(true);
+  }
 }
 
 function createTeacherListXlsx(filters) {
@@ -184,6 +231,36 @@ function getDistribucioSheet_() {
   }
 
   return sheet;
+}
+
+function getWorkloadProfessorsSheet_() {
+  const spreadsheet = getDistribucioSpreadsheet_();
+  const sheet = spreadsheet.getSheetByName(CONFIG.workloadProfessorsSheetName);
+
+  if (!sheet) {
+    throw new Error(`No s'ha trobat el full "${CONFIG.workloadProfessorsSheetName}" a Càrrega lectiva.`);
+  }
+
+  return sheet;
+}
+
+function getWorkloadTeacherEmailMap_() {
+  const sheet = getWorkloadProfessorsSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return new Map();
+
+  const values = sheet.getRange(2, 1, lastRow - 1, WORKLOAD_PROFESSORS_COLUMNS.teacherKey).getValues();
+  const emailByTeacher = new Map();
+
+  values.forEach((row) => {
+    const teacherKey = valueToString_(row[WORKLOAD_PROFESSORS_COLUMNS.teacherKey - 1]);
+    if (!teacherKey) return;
+
+    const correuInstit = valueToString_(row[WORKLOAD_PROFESSORS_COLUMNS.correuInstit - 1]);
+    emailByTeacher.set(normalizeText_(teacherKey), correuInstit);
+  });
+
+  return emailByTeacher;
 }
 
 function findLessonHeaderRow_(values) {
@@ -354,6 +431,33 @@ function getActiveTeacherRows_(filters) {
     .sort((a, b) => compareTeacherRows_(a, b));
 
   return rows;
+}
+
+function buildClassTeachersXlsxModel_(rows, parsedClass) {
+  return {
+    title: 'Professorat per classe',
+    subtitle: `Classe: ${parsedClass.course} ${parsedClass.group} · Resultats: ${rows.length} · Generat: ${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')}`,
+    headers: ['Teacher', 'Subject', 'CORREU INSTIT'],
+    rows: rows.map((row) => [row.teacherName, row.subject, row.correuInstit]),
+    columnWidths: [240, 260, 300],
+    headerBackground: '#102027',
+    headerColor: '#ffffff',
+  };
+}
+
+function buildClassTeachersFileName_(parsedClass) {
+  const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmm');
+  const classPart = sanitizeFileName_(parsedClass.course + '-' + parsedClass.group);
+  return `professorat-${classPart}-${stamp}.xlsx`;
+}
+
+function sanitizeFileName_(value) {
+  return valueToString_(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLocaleLowerCase('ca');
 }
 
 function buildTeacherListXlsxModel_(rows, filters) {
