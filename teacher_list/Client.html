@@ -3,6 +3,8 @@
     rows: [],
     departments: [],
     visibleRows: [],
+    classOptions: [],
+    classTeacherRows: [],
     loading: false,
     activeView: 'llistat',
   };
@@ -20,6 +22,11 @@
     teacherEmpty: document.getElementById('teacher-empty'),
     listError: document.getElementById('list-error'),
     exportButton: document.getElementById('export-xlsx'),
+    classFilter: document.getElementById('class-filter'),
+    classTeacherTable: document.getElementById('class-teacher-table'),
+    classTeacherCount: document.getElementById('class-teacher-count'),
+    classEmpty: document.getElementById('class-empty'),
+    classError: document.getElementById('class-error'),
   };
 
   elements.navLinks.forEach((link) => {
@@ -33,8 +40,10 @@
   elements.departmentFilter.addEventListener('change', renderTeacherList);
   elements.resetFilters.addEventListener('click', resetFilters);
   elements.exportButton.addEventListener('click', downloadCurrentListXlsx);
+  elements.classFilter.addEventListener('change', loadTeachersForSelectedClass);
 
   loadTeacherList();
+  loadClassOptions();
 
   function loadTeacherList() {
     setLoading(true, 'Carregant professorat');
@@ -53,6 +62,18 @@
         showError(getErrorMessage(error));
       })
       .getTeacherListData();
+  }
+
+  function loadClassOptions() {
+    google.script.run
+      .withSuccessHandler((options) => {
+        state.classOptions = options || [];
+        fillClassFilter();
+      })
+      .withFailureHandler((error) => {
+        showClassError(getErrorMessage(error));
+      })
+      .getClassOptions();
   }
 
   function showView(view) {
@@ -74,6 +95,50 @@
     });
 
     elements.departmentFilter.value = state.departments.includes(currentValue) ? currentValue : '';
+  }
+
+  function fillClassFilter() {
+    const currentValue = elements.classFilter.value;
+    elements.classFilter.innerHTML = '<option value="">Selecciona una classe</option>';
+
+    state.classOptions.forEach((label) => {
+      const option = document.createElement('option');
+      option.value = label;
+      option.textContent = label;
+      elements.classFilter.appendChild(option);
+    });
+
+    elements.classFilter.value = state.classOptions.includes(currentValue) ? currentValue : '';
+  }
+
+  function loadTeachersForSelectedClass() {
+    const classLabel = elements.classFilter.value;
+    state.classTeacherRows = [];
+    drawClassTeacherRows([]);
+    updateClassTeacherCount(0);
+    clearClassError();
+
+    if (!classLabel) {
+      elements.classEmpty.textContent = 'Selecciona una classe.';
+      elements.classEmpty.classList.remove('is-hidden');
+      return;
+    }
+
+    setLoading(true, 'Carregant classe');
+    google.script.run
+      .withSuccessHandler((rows) => {
+        state.classTeacherRows = rows || [];
+        drawClassTeacherRows(state.classTeacherRows);
+        updateClassTeacherCount(state.classTeacherRows.length);
+        elements.classEmpty.textContent = 'No teachers found for this class.';
+        elements.classEmpty.classList.toggle('is-hidden', state.classTeacherRows.length > 0);
+        setLoading(false);
+      })
+      .withFailureHandler((error) => {
+        setLoading(false);
+        showClassError(getErrorMessage(error));
+      })
+      .getTeachersForClass(classLabel);
   }
 
   function renderTeacherList() {
@@ -115,6 +180,30 @@
 
   function updateCount(count) {
     elements.teacherCount.textContent = count === 1 ? '1 professor' : count + ' professors';
+  }
+
+  function drawClassTeacherRows(rows) {
+    elements.classTeacherTable.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
+    rows.forEach((row, index) => {
+      const tr = document.createElement('tr');
+      tr.className = index % 2 === 0 ? 'student-band-even' : 'student-band-odd';
+      ['teacherName', 'subject'].forEach((key) => {
+        const td = document.createElement('td');
+        const value = row[key] || '';
+        td.textContent = value || '—';
+        if (!value) td.classList.add('missing');
+        tr.appendChild(td);
+      });
+      fragment.appendChild(tr);
+    });
+
+    elements.classTeacherTable.appendChild(fragment);
+  }
+
+  function updateClassTeacherCount(count) {
+    elements.classTeacherCount.textContent = count === 1 ? '1 resultat' : count + ' resultats';
   }
 
   function resetFilters() {
@@ -181,6 +270,16 @@
   function clearError() {
     elements.listError.textContent = '';
     elements.listError.classList.add('is-hidden');
+  }
+
+  function showClassError(message) {
+    elements.classError.textContent = message;
+    elements.classError.classList.remove('is-hidden');
+  }
+
+  function clearClassError() {
+    elements.classError.textContent = '';
+    elements.classError.classList.add('is-hidden');
   }
 
   function getErrorMessage(error) {

@@ -5,6 +5,7 @@ Google Apps Script web app for read-only teacher list endpoints.
 ## Views
 
 - `Llistat`: active-teacher list with name and department filters.
+- `Per classe`: selected-class teacher/subject list from `distribucio`.
 - `Estructura`: placeholder section for later behavior.
 
 ## Data Access
@@ -31,6 +32,14 @@ Displayed columns:
 - `CORREU INSTIT`: column L.
 
 Only rows where `ACTIU` column N is true are shown.
+
+## Per Classe View
+
+The `Per classe` view reads only the spreadsheet identified directly by script property `db`, sheet `distribucio`.
+
+It builds a class combo from `Curs` and `Grup`, expands comma-separated groups and `TOTS`, and displays unique teacher/subject pairs for the selected class.
+
+The view is strictly read-only.
 
 ## XLSX Export
 

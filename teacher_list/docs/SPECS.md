@@ -46,9 +46,10 @@ Main layout:
 - main content area with view sections;
 - bottom-right floating export button.
 
-The sidebar has two sections:
+The sidebar has three sections:
 
 - `Llistat`;
+- `Per classe`;
 - `Estructura`.
 
 ## `Llistat` View
@@ -69,6 +70,72 @@ The sidebar has two sections:
   - `CORREU INSTIT` from column L.
 - `CORREU INSTIT` is the actual DB header for column L.
 - Rows are sorted by `COGNOM1`, then `COGNOM2`, then `NOM`, then `DEPT.`.
+
+## `Per classe` View
+
+Goal: show which teachers teach a selected class/group and which subject each teacher teaches.
+
+Data source for this section:
+
+- Read script property `db`.
+- Treat `db` as the direct spreadsheet ID.
+- Open sheet `distribucio`.
+- Do not read any other sheet for this section.
+- Do not write anything.
+
+Expected `distribucio` structure:
+
+- teacher names: row 2, from column M onward;
+- lesson header row: row where column A exactly equals `Curs` and column C exactly equals `Assignatura`;
+- lesson data rows: rows below the lesson header row;
+- course: column A;
+- group: column B;
+- subject: column C;
+- teacher allocation cells: columns M onward.
+
+Class combo generation:
+
+1. Find the lesson header row.
+2. Read rows below that header.
+3. Read `Curs` from column A and `Grup` from column B.
+4. Skip rows where `Curs` or `Grup` is empty.
+5. Build class labels as `Curs + " " + Grup`.
+6. Expand comma-separated groups into individual labels.
+7. Expand `TOTS` using known groups.
+8. Remove duplicates.
+9. Sort naturally: ESO first, BAT next, other groups last; within each stage, by course number and group.
+
+Known `TOTS` expansion:
+
+- `1ESO`: `A`, `B`, `C`, `D`, `E`;
+- `2ESO`: `A`, `B`, `C`, `D`, `E`;
+- `3ESO`: `A`, `B`, `C`, `D`, `E`;
+- `4ESO`: `A`, `B`, `C`, `D`, `E`;
+- `1BAT`: `A`, `B`, `C`;
+- `2BAT`: `A`, `B`.
+
+When a class is selected:
+
+1. Parse the selected label into course and group.
+2. Keep rows where column A matches course and column B includes the selected group.
+3. A row matches when `Grup` exactly equals the group, is comma-separated and includes it, or is `TOTS` and the selected group belongs to the course's known groups.
+4. For each matching row, read subject from column C.
+5. Scan columns M onward.
+6. If an allocation cell is numeric and greater than 0, row 2 of that column is the teacher for that subject.
+7. Collapse duplicate teacher/subject pairs using key `teacherName + "::" + subject`.
+8. Sort by teacher name, then subject.
+
+Display:
+
+- combo box with all classes/groups;
+- results table with columns `Teacher` and `Subject`;
+- if no class is selected, show no results;
+- if a class has no rows, show `No teachers found for this class.`.
+
+Read-only rule:
+
+- allowed: read script property `db`, open spreadsheet, read `distribucio`, render UI;
+- forbidden: writing cell values, clearing cells, modifying sheets, creating sheets, editing properties.
 
 ## `Estructura` View
 
@@ -122,6 +189,8 @@ Expected server-side functions:
 - `include_(filename)`: includes template partials.
 - `grantRequiredPermissions()`: helper to trigger all needed authorization scopes.
 - `getTeacherListData()`: returns active teachers and department options for the browser.
+- `getClassOptions()`: returns class labels from `distribucio`.
+- `getTeachersForClass(classLabel)`: returns teacher/subject rows for the selected class.
 - `createTeacherListXlsx(filters)`: exports the current filtered list as XLSX.
 - `getTeacherDbSpreadsheet_()`: resolves and opens DB.
 - `getTeacherDbSheet_()`: opens DB sheet `Llista`.

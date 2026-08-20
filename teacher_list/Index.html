@@ -22,6 +22,7 @@
 
         <nav class="nav">
           <a class="nav-link active" href="#" data-view="llistat">Llistat</a>
+          <a class="nav-link" href="#" data-view="per-classe">Per classe</a>
           <a class="nav-link" href="#" data-view="estructura">Estructura</a>
         </nav>
       </aside>
@@ -72,6 +73,44 @@
             </div>
 
             <p class="empty is-hidden" id="teacher-empty">No hi ha professors per mostrar.</p>
+          </section>
+        </section>
+
+        <section class="view" id="view-per-classe">
+          <header class="page-header">
+            <h1>Per classe</h1>
+          </header>
+
+          <section class="filters" aria-label="Filtres per classe">
+            <label class="filter-field">
+              <span>Classe</span>
+              <select id="class-filter">
+                <option value="">Selecciona una classe</option>
+              </select>
+            </label>
+          </section>
+
+          <section class="table-section" aria-labelledby="class-teachers-title">
+            <div class="section-header">
+              <h2 id="class-teachers-title">Professorat de la classe</h2>
+              <span class="count" id="class-teacher-count">0 resultats</span>
+            </div>
+
+            <div class="error-box is-hidden" id="class-error"></div>
+
+            <div class="table-wrap">
+              <table class="class-teachers-table">
+                <thead>
+                  <tr>
+                    <th>Teacher</th>
+                    <th>Subject</th>
+                  </tr>
+                </thead>
+                <tbody id="class-teacher-table"></tbody>
+              </table>
+            </div>
+
+            <p class="empty" id="class-empty">Selecciona una classe.</p>
           </section>
         </section>
 
