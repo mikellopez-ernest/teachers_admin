@@ -11,7 +11,7 @@ Google Apps Script web app for read-only teacher list endpoints.
 
 This script resolves DB the same way as the other scripts in this workspace:
 
-1. Read script property `Tables`.
+1. Read script property `db`.
 2. Open that registry spreadsheet.
 3. Read sheet `tables`.
 4. Find the row where column A is exactly `Dades de professors`.
@@ -44,7 +44,7 @@ Run `grantRequiredPermissions()` manually from the Apps Script editor to grant a
 
 Required script property:
 
-- `Tables`: registry spreadsheet ID.
+- `db`: registry spreadsheet ID.
 
 ## Local Development
 

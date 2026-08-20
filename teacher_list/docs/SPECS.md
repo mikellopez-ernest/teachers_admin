@@ -23,7 +23,7 @@
 
 The script works with DB using the same registry pattern as the other scripts in this repository.
 
-1. Read script property `Tables`.
+1. Read script property `db`.
 2. Treat that property as the ID of a registry spreadsheet.
 3. Open sheet `tables` in the registry spreadsheet.
 4. Find the row where column A is exactly `Dades de professors`.

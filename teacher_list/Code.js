@@ -1,5 +1,5 @@
 const CONFIG = {
-  registryPropertyName: 'Tables',
+  registryPropertyName: 'db',
   registrySheetName: 'tables',
   teacherDbName: 'Dades de professors',
   teacherDbSheetName: 'Llista',
