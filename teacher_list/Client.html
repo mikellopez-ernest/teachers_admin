@@ -1,0 +1,197 @@
+<script>
+  const state = {
+    rows: [],
+    departments: [],
+    visibleRows: [],
+    loading: false,
+    activeView: 'llistat',
+  };
+
+  const elements = {
+    loadingOverlay: document.getElementById('loading-overlay'),
+    loadingMessage: document.getElementById('loading-message'),
+    navLinks: document.querySelectorAll('.nav-link'),
+    views: document.querySelectorAll('.view'),
+    nameFilter: document.getElementById('name-filter'),
+    departmentFilter: document.getElementById('department-filter'),
+    resetFilters: document.getElementById('reset-filters'),
+    teacherTable: document.getElementById('teacher-table'),
+    teacherCount: document.getElementById('teacher-count'),
+    teacherEmpty: document.getElementById('teacher-empty'),
+    listError: document.getElementById('list-error'),
+    exportButton: document.getElementById('export-xlsx'),
+  };
+
+  elements.navLinks.forEach((link) => {
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      showView(link.dataset.view);
+    });
+  });
+
+  elements.nameFilter.addEventListener('input', renderTeacherList);
+  elements.departmentFilter.addEventListener('change', renderTeacherList);
+  elements.resetFilters.addEventListener('click', resetFilters);
+  elements.exportButton.addEventListener('click', downloadCurrentListXlsx);
+
+  loadTeacherList();
+
+  function loadTeacherList() {
+    setLoading(true, 'Carregant professorat');
+    clearError();
+
+    google.script.run
+      .withSuccessHandler((data) => {
+        state.rows = data.rows || [];
+        state.departments = data.departments || [];
+        fillDepartmentFilter();
+        renderTeacherList();
+        setLoading(false);
+      })
+      .withFailureHandler((error) => {
+        setLoading(false);
+        showError(getErrorMessage(error));
+      })
+      .getTeacherListData();
+  }
+
+  function showView(view) {
+    state.activeView = view;
+    elements.navLinks.forEach((link) => link.classList.toggle('active', link.dataset.view === view));
+    elements.views.forEach((section) => section.classList.toggle('active', section.id === 'view-' + view));
+    elements.exportButton.classList.toggle('is-hidden', view !== 'llistat');
+  }
+
+  function fillDepartmentFilter() {
+    const currentValue = elements.departmentFilter.value;
+    elements.departmentFilter.innerHTML = '<option value="">Tots</option>';
+
+    state.departments.forEach((department) => {
+      const option = document.createElement('option');
+      option.value = department;
+      option.textContent = department;
+      elements.departmentFilter.appendChild(option);
+    });
+
+    elements.departmentFilter.value = state.departments.includes(currentValue) ? currentValue : '';
+  }
+
+  function renderTeacherList() {
+    const filters = getFilters();
+    const rows = state.rows.filter((row) => {
+      if (filters.department && row.dept !== filters.department) return false;
+      if (filters.search) {
+        const haystack = normalize([row.nom, row.cognom1, row.cognom2].join(' '));
+        if (!haystack.includes(filters.search)) return false;
+      }
+      return true;
+    });
+
+    state.visibleRows = rows;
+    drawTeacherRows(rows);
+    updateCount(rows.length);
+    elements.teacherEmpty.classList.toggle('is-hidden', rows.length > 0);
+  }
+
+  function drawTeacherRows(rows) {
+    elements.teacherTable.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
+    rows.forEach((row, index) => {
+      const tr = document.createElement('tr');
+      tr.className = index % 2 === 0 ? 'student-band-even' : 'student-band-odd';
+      ['dept', 'nom', 'cognom1', 'cognom2', 'correuInstit'].forEach((key) => {
+        const td = document.createElement('td');
+        const value = row[key] || '';
+        td.textContent = value || '—';
+        if (!value) td.classList.add('missing');
+        tr.appendChild(td);
+      });
+      fragment.appendChild(tr);
+    });
+
+    elements.teacherTable.appendChild(fragment);
+  }
+
+  function updateCount(count) {
+    elements.teacherCount.textContent = count === 1 ? '1 professor' : count + ' professors';
+  }
+
+  function resetFilters() {
+    elements.nameFilter.value = '';
+    elements.departmentFilter.value = '';
+    renderTeacherList();
+  }
+
+  function downloadCurrentListXlsx() {
+    const filters = getRawFilters();
+    setLoading(true, 'Exportant XLSX');
+    clearError();
+    elements.exportButton.disabled = true;
+
+    google.script.run
+      .withSuccessHandler((file) => {
+        triggerFileDownload(file);
+        elements.exportButton.disabled = false;
+        setLoading(false);
+      })
+      .withFailureHandler((error) => {
+        elements.exportButton.disabled = false;
+        setLoading(false);
+        showError(getErrorMessage(error));
+      })
+      .createTeacherListXlsx(filters);
+  }
+
+  function triggerFileDownload(file) {
+    const link = document.createElement('a');
+    link.href = 'data:' + file.mimeType + ';base64,' + file.base64;
+    link.download = file.fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function getRawFilters() {
+    return {
+      search: elements.nameFilter.value.trim(),
+      department: elements.departmentFilter.value,
+    };
+  }
+
+  function getFilters() {
+    const raw = getRawFilters();
+    return {
+      search: normalize(raw.search),
+      department: raw.department,
+    };
+  }
+
+  function setLoading(isLoading, message) {
+    state.loading = isLoading;
+    elements.loadingOverlay.classList.toggle('is-hidden', !isLoading);
+    if (message) elements.loadingMessage.textContent = message;
+  }
+
+  function showError(message) {
+    elements.listError.textContent = message;
+    elements.listError.classList.remove('is-hidden');
+  }
+
+  function clearError() {
+    elements.listError.textContent = '';
+    elements.listError.classList.add('is-hidden');
+  }
+
+  function getErrorMessage(error) {
+    if (!error) return 'Error desconegut.';
+    return error.message || String(error);
+  }
+
+  function normalize(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLocaleLowerCase('ca');
+  }
+</script>

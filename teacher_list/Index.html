@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ca">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Llistat professorat</title>
+    <?!= include_('Styles'); ?>
+  </head>
+  <body>
+    <div class="loading-overlay" id="loading-overlay">
+      <div class="loader" aria-label="Carregant"></div>
+      <div class="loading-message" id="loading-message">Carregant</div>
+    </div>
+
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Menu principal">
+        <div class="brand">
+          <span class="brand-mark">P</span>
+          <span class="brand-text">Professorat</span>
+        </div>
+
+        <nav class="nav">
+          <a class="nav-link active" href="#" data-view="llistat">Llistat</a>
+          <a class="nav-link" href="#" data-view="estructura">Estructura</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <section class="view active" id="view-llistat">
+          <header class="page-header">
+            <h1>Llistat professorat</h1>
+          </header>
+
+          <section class="filters" aria-label="Filtres">
+            <label class="filter-field">
+              <span>Nom</span>
+              <input id="name-filter" type="search" placeholder="Nom o cognoms">
+            </label>
+
+            <label class="filter-field">
+              <span>DEPT.</span>
+              <select id="department-filter">
+                <option value="">Tots</option>
+              </select>
+            </label>
+
+            <button class="button" id="reset-filters" type="button">Reinicia</button>
+          </section>
+
+          <section class="table-section" aria-labelledby="teacher-list-title">
+            <div class="section-header">
+              <h2 id="teacher-list-title">Professorat actiu</h2>
+              <span class="count" id="teacher-count">0 professors</span>
+            </div>
+
+            <div class="error-box is-hidden" id="list-error"></div>
+
+            <div class="table-wrap">
+              <table class="teachers-table">
+                <thead>
+                  <tr>
+                    <th>DEPT.</th>
+                    <th>NOM</th>
+                    <th>COGNOM1</th>
+                    <th>COGNOM2</th>
+                    <th>CORREU INSTIT</th>
+                  </tr>
+                </thead>
+                <tbody id="teacher-table"></tbody>
+              </table>
+            </div>
+
+            <p class="empty is-hidden" id="teacher-empty">No hi ha professors per mostrar.</p>
+          </section>
+        </section>
+
+        <section class="view" id="view-estructura">
+          <header class="page-header">
+            <h1>Estructura</h1>
+          </header>
+
+          <section class="table-section" aria-labelledby="structure-title">
+            <div class="section-header">
+              <h2 id="structure-title">Estructura</h2>
+            </div>
+            <p class="empty">Pendent de definir.</p>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <button class="export-button" id="export-xlsx" type="button" aria-label="Exporta XLSX" title="Exporta XLSX">
+      <i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i>
+    </button>
+
+    <?!= include_('Client'); ?>
+  </body>
+</html>

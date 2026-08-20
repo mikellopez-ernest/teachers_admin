@@ -13,6 +13,7 @@ Each Apps Script project lives in its own folder. A script folder should contain
 Current scripts:
 
 - `teacher_admin/`: teacher database administration endpoint.
+- `teacher_list/`: teacher-list endpoint.
 
 ## Local Secrets
 
