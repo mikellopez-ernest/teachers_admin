@@ -78,8 +78,10 @@ Goal: show which teachers teach a selected class/group and which subject each te
 Data source for this section:
 
 - Read script property `db`.
-- Treat `db` as the direct spreadsheet ID.
-- Open sheet `distribucio`.
+- Treat `db` as the registry spreadsheet ID.
+- In registry sheet `tables`, find row where column A is exactly `Càrrega lectiva`.
+- Use column B from that row as the Càrrega lectiva spreadsheet ID.
+- Open sheet `distribucio` in that spreadsheet.
 - Do not read any other sheet for this section.
 - Do not write anything.
 
@@ -134,7 +136,7 @@ Display:
 
 Read-only rule:
 
-- allowed: read script property `db`, open spreadsheet, read `distribucio`, render UI;
+- allowed: read script property `db`, open registry spreadsheet, open `Càrrega lectiva`, read `distribucio`, render UI;
 - forbidden: writing cell values, clearing cells, modifying sheets, creating sheets, editing properties.
 
 ## `Estructura` View

@@ -35,7 +35,7 @@ Only rows where `ACTIU` column N is true are shown.
 
 ## Per Classe View
 
-The `Per classe` view reads only the spreadsheet identified directly by script property `db`, sheet `distribucio`.
+The `Per classe` view reads script property `db` as the registry spreadsheet ID, finds `Càrrega lectiva` in `tables`, and opens its `distribucio` sheet.
 
 It builds a class combo from `Curs` and `Grup`, expands comma-separated groups and `TOTS`, and displays unique teacher/subject pairs for the selected class.
 

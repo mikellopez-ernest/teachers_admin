@@ -2,6 +2,7 @@ const CONFIG = {
   registryPropertyName: 'db',
   registrySheetName: 'tables',
   teacherDbName: 'Dades de professors',
+  workloadDbName: 'Càrrega lectiva',
   teacherDbSheetName: 'Llista',
   distribucioSheetName: 'distribucio',
   xlsxMimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -171,14 +172,7 @@ function createTeacherListXlsx(filters) {
 }
 
 function getDistribucioSpreadsheet_() {
-  const scriptProperties = PropertiesService.getScriptProperties();
-  const spreadsheetId = scriptProperties.getProperty(CONFIG.registryPropertyName);
-
-  if (!spreadsheetId) {
-    throw new Error(`Falta la propietat de script "${CONFIG.registryPropertyName}".`);
-  }
-
-  return SpreadsheetApp.openById(String(spreadsheetId).trim());
+  return getRegisteredSpreadsheet_(CONFIG.workloadDbName);
 }
 
 function getDistribucioSheet_() {
@@ -285,6 +279,15 @@ function parseClassLabelForSort_(label) {
 }
 
 function getTeacherDbSpreadsheet_() {
+  const registrySpreadsheet = getRegistrySpreadsheet_();
+  if (registrySpreadsheet.getSheetByName(CONFIG.teacherDbSheetName)) {
+    return registrySpreadsheet;
+  }
+
+  return getRegisteredSpreadsheet_(CONFIG.teacherDbName, registrySpreadsheet);
+}
+
+function getRegistrySpreadsheet_() {
   const scriptProperties = PropertiesService.getScriptProperties();
   const spreadsheetId = scriptProperties.getProperty(CONFIG.registryPropertyName);
 
@@ -292,21 +295,22 @@ function getTeacherDbSpreadsheet_() {
     throw new Error(`Falta la propietat de script "${CONFIG.registryPropertyName}".`);
   }
 
-  const spreadsheet = SpreadsheetApp.openById(String(spreadsheetId).trim());
-  if (spreadsheet.getSheetByName(CONFIG.teacherDbSheetName)) {
-    return spreadsheet;
-  }
+  return SpreadsheetApp.openById(String(spreadsheetId).trim());
+}
 
+function getRegisteredSpreadsheet_(logicalName, registrySpreadsheet) {
+  const spreadsheet = registrySpreadsheet || getRegistrySpreadsheet_();
   const registrySheet = spreadsheet.getSheetByName(CONFIG.registrySheetName);
+
   if (!registrySheet) {
-    throw new Error(`No s'ha trobat el full "${CONFIG.teacherDbSheetName}" ni el registre "${CONFIG.registrySheetName}".`);
+    throw new Error(`No s'ha trobat el full de registre "${CONFIG.registrySheetName}".`);
   }
 
   const values = registrySheet.getDataRange().getValues();
-  const match = values.find((row) => row[0] === CONFIG.teacherDbName);
+  const match = values.find((row) => row[0] === logicalName);
 
   if (!match || !match[1]) {
-    throw new Error(`No s'ha trobat "${CONFIG.teacherDbName}" al registre de taules.`);
+    throw new Error(`No s'ha trobat "${logicalName}" al registre de taules.`);
   }
 
   return SpreadsheetApp.openById(String(match[1]).trim());
