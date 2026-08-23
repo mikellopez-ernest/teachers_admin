@@ -6,6 +6,7 @@ const CONFIG = {
   teacherDbSheetName: 'Llista',
   distribucioSheetName: 'distribucio',
   workloadProfessorsSheetName: 'professors',
+  workloadCarrecsSheetName: 'carrecs',
   xlsxMimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
 
@@ -28,6 +29,12 @@ const DISTRIBUCIO_COLUMNS = {
 const WORKLOAD_PROFESSORS_COLUMNS = {
   correuInstit: 12,
   teacherKey: 17,
+};
+
+const CARRECS_COLUMNS = {
+  carrec: 1,
+  asignado: 4,
+  isCarrec: 6,
 };
 
 const KNOWN_GROUPS = {
@@ -62,6 +69,8 @@ function grantRequiredPermissions() {
   distribucioSheet.getRange(1, 1).getValue();
   const workloadProfessorsSheet = getWorkloadProfessorsSheet_();
   workloadProfessorsSheet.getRange(1, 1).getValue();
+  const carrecsSheet = getWorkloadCarrecsSheet_();
+  carrecsSheet.getRange(1, 1).getValue();
 
   const tempSpreadsheet = SpreadsheetApp.create('teacher_list_permission_check');
   const tempFile = DriveApp.getFileById(tempSpreadsheet.getId());
@@ -79,6 +88,7 @@ function grantRequiredPermissions() {
       teacherSheetName: sheet.getName(),
       distribucioSheetName: distribucioSheet.getName(),
       workloadProfessorsSheetName: workloadProfessorsSheet.getName(),
+      carrecsSheetName: carrecsSheet.getName(),
       exportStatus: response.getResponseCode(),
       message: 'Permisos concedits correctament.',
     };
@@ -96,6 +106,48 @@ function getTeacherListData() {
     rows,
     departments,
   };
+}
+
+function getStructureData() {
+  return {
+    rows: getStructureRows_({}),
+  };
+}
+
+function createStructureXlsx(filters) {
+  const normalizedFilters = normalizeStructureFilters_(filters || {});
+  const rows = getStructureRows_(normalizedFilters);
+  const model = buildStructureXlsxModel_(rows, normalizedFilters);
+  const fileName = buildStructureFileName_();
+  const tempSpreadsheet = SpreadsheetApp.create(fileName.replace(/\.xlsx$/i, ''));
+  const tempFile = DriveApp.getFileById(tempSpreadsheet.getId());
+
+  try {
+    const sheet = tempSpreadsheet.getSheets()[0];
+    sheet.setName('Estructura');
+    applyTeacherListSheet_(sheet, model);
+    SpreadsheetApp.flush();
+
+    const response = UrlFetchApp.fetch(getXlsxExportUrl_(tempSpreadsheet.getId()), {
+      headers: {
+        Authorization: 'Bearer ' + ScriptApp.getOAuthToken(),
+      },
+      muteHttpExceptions: true,
+    });
+
+    if (response.getResponseCode() !== 200) {
+      throw new Error(`No s'ha pogut exportar l'estructura XLSX (${response.getResponseCode()}).`);
+    }
+
+    return {
+      fileName,
+      mimeType: CONFIG.xlsxMimeType,
+      base64: Utilities.base64Encode(response.getBlob().getBytes()),
+      message: `S'ha exportat l'estructura amb ${rows.length} càrrecs.`,
+    };
+  } finally {
+    tempFile.setTrashed(true);
+  }
 }
 
 function getClassOptions() {
@@ -239,6 +291,17 @@ function getWorkloadProfessorsSheet_() {
 
   if (!sheet) {
     throw new Error(`No s'ha trobat el full "${CONFIG.workloadProfessorsSheetName}" a Càrrega lectiva.`);
+  }
+
+  return sheet;
+}
+
+function getWorkloadCarrecsSheet_() {
+  const spreadsheet = getDistribucioSpreadsheet_();
+  const sheet = spreadsheet.getSheetByName(CONFIG.workloadCarrecsSheetName);
+
+  if (!sheet) {
+    throw new Error(`No s'ha trobat el full "${CONFIG.workloadCarrecsSheetName}" a Càrrega lectiva.`);
   }
 
   return sheet;
@@ -431,6 +494,59 @@ function getActiveTeacherRows_(filters) {
     .sort((a, b) => compareTeacherRows_(a, b));
 
   return rows;
+}
+
+function getStructureRows_(filters) {
+  const normalizedFilters = normalizeStructureFilters_(filters || {});
+  const sheet = getWorkloadCarrecsSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  const values = sheet.getRange(2, 1, lastRow - 1, CARRECS_COLUMNS.isCarrec).getValues();
+  return values
+    .map((row, index) => ({
+      rowNumber: index + 2,
+      carrec: valueToString_(row[CARRECS_COLUMNS.carrec - 1]),
+      asignado: valueToString_(row[CARRECS_COLUMNS.asignado - 1]),
+      isCarrec: isTrue_(row[CARRECS_COLUMNS.isCarrec - 1]),
+    }))
+    .filter((row) => row.isCarrec)
+    .filter((row) => {
+      if (!normalizedFilters.search) return true;
+      return normalizeText_([row.carrec, row.asignado].join(' ')).includes(normalizedFilters.search);
+    });
+}
+
+function normalizeStructureFilters_(filters) {
+  const rawSearch = valueToString_(filters.search || filters.text || '');
+  return {
+    rawSearch,
+    search: normalizeText_(rawSearch),
+  };
+}
+
+function buildStructureXlsxModel_(rows, filters) {
+  return {
+    title: 'Estructura',
+    subtitle: buildStructureSubtitle_(rows, filters),
+    headers: ['carrec', 'asignado?'],
+    rows: rows.map((row) => [row.carrec, row.asignado]),
+    columnWidths: [320, 280],
+    headerBackground: '#102027',
+    headerColor: '#ffffff',
+  };
+}
+
+function buildStructureSubtitle_(rows, filters) {
+  const parts = [`Càrrecs: ${rows.length}`];
+  if (filters.search) parts.push(`Filtre: ${filters.rawSearch}`);
+  parts.push(`Generat: ${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')}`);
+  return parts.join(' · ');
+}
+
+function buildStructureFileName_() {
+  const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmm');
+  return `estructura-carrecs-${stamp}.xlsx`;
 }
 
 function buildClassTeachersXlsxModel_(rows, parsedClass) {

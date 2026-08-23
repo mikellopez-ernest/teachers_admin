@@ -5,6 +5,8 @@
     visibleRows: [],
     classOptions: [],
     classTeacherRows: [],
+    structureRows: [],
+    visibleStructureRows: [],
     loading: false,
     activeView: 'llistat',
   };
@@ -27,6 +29,12 @@
     classTeacherCount: document.getElementById('class-teacher-count'),
     classEmpty: document.getElementById('class-empty'),
     classError: document.getElementById('class-error'),
+    structureFilter: document.getElementById('structure-filter'),
+    resetStructureFilters: document.getElementById('reset-structure-filters'),
+    structureTable: document.getElementById('structure-table'),
+    structureCount: document.getElementById('structure-count'),
+    structureEmpty: document.getElementById('structure-empty'),
+    structureError: document.getElementById('structure-error'),
   };
 
   elements.navLinks.forEach((link) => {
@@ -41,9 +49,12 @@
   elements.resetFilters.addEventListener('click', resetFilters);
   elements.exportButton.addEventListener('click', downloadCurrentViewXlsx);
   elements.classFilter.addEventListener('change', loadTeachersForSelectedClass);
+  elements.structureFilter.addEventListener('input', renderStructureList);
+  elements.resetStructureFilters.addEventListener('click', resetStructureFilters);
 
   loadTeacherList();
   loadClassOptions();
+  loadStructureData();
 
   function loadTeacherList() {
     setLoading(true, 'Carregant professorat');
@@ -64,6 +75,18 @@
       .getTeacherListData();
   }
 
+  function loadStructureData() {
+    google.script.run
+      .withSuccessHandler((data) => {
+        state.structureRows = data.rows || [];
+        renderStructureList();
+      })
+      .withFailureHandler((error) => {
+        showStructureError(getErrorMessage(error));
+      })
+      .getStructureData();
+  }
+
   function loadClassOptions() {
     google.script.run
       .withSuccessHandler((options) => {
@@ -80,7 +103,7 @@
     state.activeView = view;
     elements.navLinks.forEach((link) => link.classList.toggle('active', link.dataset.view === view));
     elements.views.forEach((section) => section.classList.toggle('active', section.id === 'view-' + view));
-    elements.exportButton.classList.toggle('is-hidden', !['llistat', 'per-classe'].includes(view));
+    elements.exportButton.classList.toggle('is-hidden', !['llistat', 'per-classe', 'estructura'].includes(view));
   }
 
   function fillDepartmentFilter() {
@@ -206,15 +229,62 @@
     elements.classTeacherCount.textContent = count === 1 ? '1 resultat' : count + ' resultats';
   }
 
+  function renderStructureList() {
+    const filters = getStructureFilters();
+    const rows = state.structureRows.filter((row) => {
+      if (!filters.search) return true;
+      return normalize([row.carrec, row.asignado].join(' ')).includes(filters.search);
+    });
+
+    state.visibleStructureRows = rows;
+    drawStructureRows(rows);
+    updateStructureCount(rows.length);
+    elements.structureEmpty.classList.toggle('is-hidden', rows.length > 0);
+  }
+
+  function drawStructureRows(rows) {
+    elements.structureTable.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
+    rows.forEach((row, index) => {
+      const tr = document.createElement('tr');
+      tr.className = index % 2 === 0 ? 'student-band-even' : 'student-band-odd';
+      ['carrec', 'asignado'].forEach((key) => {
+        const td = document.createElement('td');
+        const value = row[key] || '';
+        td.textContent = value || '—';
+        if (!value) td.classList.add('missing');
+        tr.appendChild(td);
+      });
+      fragment.appendChild(tr);
+    });
+
+    elements.structureTable.appendChild(fragment);
+  }
+
+  function updateStructureCount(count) {
+    elements.structureCount.textContent = count === 1 ? '1 càrrec' : count + ' càrrecs';
+  }
+
   function resetFilters() {
     elements.nameFilter.value = '';
     elements.departmentFilter.value = '';
     renderTeacherList();
   }
 
+  function resetStructureFilters() {
+    elements.structureFilter.value = '';
+    renderStructureList();
+  }
+
   function downloadCurrentViewXlsx() {
     if (state.activeView === 'per-classe') {
       downloadCurrentClassXlsx();
+      return;
+    }
+
+    if (state.activeView === 'estructura') {
+      downloadCurrentStructureXlsx();
       return;
     }
 
@@ -266,6 +336,26 @@
       .createClassTeachersXlsx(classLabel);
   }
 
+  function downloadCurrentStructureXlsx() {
+    const filters = getRawStructureFilters();
+    setLoading(true, 'Exportant XLSX');
+    clearStructureError();
+    elements.exportButton.disabled = true;
+
+    google.script.run
+      .withSuccessHandler((file) => {
+        triggerFileDownload(file);
+        elements.exportButton.disabled = false;
+        setLoading(false);
+      })
+      .withFailureHandler((error) => {
+        elements.exportButton.disabled = false;
+        setLoading(false);
+        showStructureError(getErrorMessage(error));
+      })
+      .createStructureXlsx(filters);
+  }
+
   function triggerFileDownload(file) {
     const link = document.createElement('a');
     link.href = 'data:' + file.mimeType + ';base64,' + file.base64;
@@ -287,6 +377,19 @@
     return {
       search: normalize(raw.search),
       department: raw.department,
+    };
+  }
+
+  function getRawStructureFilters() {
+    return {
+      search: elements.structureFilter.value.trim(),
+    };
+  }
+
+  function getStructureFilters() {
+    const raw = getRawStructureFilters();
+    return {
+      search: normalize(raw.search),
     };
   }
 
@@ -314,6 +417,16 @@
   function clearClassError() {
     elements.classError.textContent = '';
     elements.classError.classList.add('is-hidden');
+  }
+
+  function showStructureError(message) {
+    elements.structureError.textContent = message;
+    elements.structureError.classList.remove('is-hidden');
+  }
+
+  function clearStructureError() {
+    elements.structureError.textContent = '';
+    elements.structureError.classList.add('is-hidden');
   }
 
   function getErrorMessage(error) {

@@ -148,8 +148,38 @@ Read-only rule:
 
 ## `Estructura` View
 
-- Section exists in the left menu and page shell.
-- Behavior is reserved for a later phase.
+Data source:
+
+- Read script property `db`.
+- Treat `db` as the registry spreadsheet ID.
+- In registry sheet `tables`, find row where column A is exactly `Càrrega lectiva`.
+- Use column B from that row as the Càrrega lectiva spreadsheet ID.
+- Open sheet `carrecs` in that spreadsheet.
+- Do not write anything.
+
+Expected `carrecs` structure:
+
+- `carrec`: column A;
+- `hores lectives`: column B;
+- `nom en horaris`: column C;
+- `asignado?`: column D;
+- `Lectives?`: column E;
+- `is_carrec`: column F.
+
+Display:
+
+- Show only rows where `is_carrec` is true.
+- Boolean reads accept real boolean `true` and string `TRUE`.
+- Results table columns:
+  - `carrec` from column A;
+  - `asignado?` from column D.
+- Above the table, show a text box filtering by `carrec` or `asignado?`.
+- Include a reset button that clears the text filter.
+
+Read-only rule:
+
+- allowed: read script property `db`, open registry spreadsheet, open `Càrrega lectiva`, read `carrecs`, render UI;
+- forbidden: writing cell values, clearing cells, modifying sheets, creating sheets, editing properties.
 
 ## XLSX Export
 
@@ -158,7 +188,8 @@ The floating bottom-right export button:
 - is visible on `Llistat`;
 - uses Bootstrap Icons class `bi-file-earmark-spreadsheet`;
 - exports the current filtered list to XLSX format on `Llistat`;
-- exports the selected class teacher/subject/email table to XLSX format on `Per classe`.
+- exports the selected class teacher/subject/email table to XLSX format on `Per classe`;
+- exports the current filtered `Estructura` table to XLSX format on `Estructura`.
 
 Export process:
 
@@ -203,6 +234,8 @@ Expected server-side functions:
 - `getTeachersForClass(classLabel)`: returns teacher/subject/email rows for the selected class.
 - `createTeacherListXlsx(filters)`: exports the current filtered list as XLSX.
 - `createClassTeachersXlsx(classLabel)`: exports the selected class teacher/subject/email table as XLSX.
+- `getStructureData()`: returns `carrecs` rows where `is_carrec` is true.
+- `createStructureXlsx(filters)`: exports the current filtered `Estructura` table as XLSX.
 - `getTeacherDbSpreadsheet_()`: resolves and opens DB.
 - `getTeacherDbSheet_()`: opens DB sheet `Llista`.
 

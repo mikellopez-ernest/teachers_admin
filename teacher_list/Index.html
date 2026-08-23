@@ -120,11 +120,36 @@
             <h1>Estructura</h1>
           </header>
 
+          <section class="filters" aria-label="Filtres estructura">
+            <label class="filter-field">
+              <span>Text</span>
+              <input id="structure-filter" type="search" placeholder="Càrrec o asignado?">
+            </label>
+
+            <button class="button" id="reset-structure-filters" type="button">Reinicia</button>
+          </section>
+
           <section class="table-section" aria-labelledby="structure-title">
             <div class="section-header">
-              <h2 id="structure-title">Estructura</h2>
+              <h2 id="structure-title">Càrrecs</h2>
+              <span class="count" id="structure-count">0 càrrecs</span>
             </div>
-            <p class="empty">Pendent de definir.</p>
+
+            <div class="error-box is-hidden" id="structure-error"></div>
+
+            <div class="table-wrap">
+              <table class="structure-table">
+                <thead>
+                  <tr>
+                    <th>carrec</th>
+                    <th>asignado?</th>
+                  </tr>
+                </thead>
+                <tbody id="structure-table"></tbody>
+              </table>
+            </div>
+
+            <p class="empty is-hidden" id="structure-empty">No hi ha càrrecs per mostrar.</p>
           </section>
         </section>
       </main>

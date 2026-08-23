@@ -6,7 +6,7 @@ Google Apps Script web app for read-only teacher list endpoints.
 
 - `Llistat`: active-teacher list with name and department filters.
 - `Per classe`: selected-class teacher/subject list from `distribucio`.
-- `Estructura`: placeholder section for later behavior.
+- `Estructura`: read-only list of càrrecs from `Càrrega lectiva -> carrecs`.
 
 ## Data Access
 
@@ -41,9 +41,20 @@ It builds a class combo from `Curs` and `Grup`, expands comma-separated groups a
 
 The view is strictly read-only.
 
+## Estructura View
+
+The `Estructura` view reads `Càrrega lectiva -> carrecs` and shows rows where `is_carrec` column F is true.
+
+Displayed columns:
+
+- `carrec`: column A.
+- `asignado?`: column D.
+
+A text filter searches both displayed columns, and `Reinicia` clears it.
+
 ## XLSX Export
 
-The bottom-right floating export button uses Bootstrap Icon `bi-file-earmark-spreadsheet`. It exports the current filtered teacher list on `Llistat`, and the selected class teacher/subject/email table on `Per classe`.
+The bottom-right floating export button uses Bootstrap Icon `bi-file-earmark-spreadsheet`. It exports the current filtered teacher list on `Llistat`, the selected class teacher/subject/email table on `Per classe`, and the current filtered càrrecs table on `Estructura`.
 
 The backend creates a temporary Google Spreadsheet, writes the list into it, exports it through the Drive XLSX export endpoint, returns the file as base64 to the browser, and trashes the temporary spreadsheet in a `finally` block.
 
