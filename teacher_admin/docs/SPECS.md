@@ -166,7 +166,7 @@ If no rows are selected, clicking an action button shows a warning and does not 
 
 - Clicking `Donar de baixa` opens a modal asking for:
   - start date, defaulting to today, using a Spanish datepicker with Monday as the first day of the week;
-  - substitute teacher, selected from teachers in `Llista` with a `REDUIT` code, where `BAIXA?` column O is not true and `SUBST?` column P is not true; the combo displays name and surnames, but the stored substitute code is `REDUIT` from column F;
+  - substitute teacher, selected from teachers in `Llista` with a `REDUIT` code, where `BAIXA?` column O is not true and `SUBST?` column P is not true; the selected absent teacher is excluded, but teachers with the same `ESP` are allowed; the combo displays name and surnames, but the stored substitute code is `REDUIT` from column F;
   - comments.
 - Confirming the modal sets `Llista` column O to boolean `true` for the selected absent teacher.
 - Confirming the modal sets `Llista` column P `SUBST?` to boolean `true` for the selected substitute teacher.

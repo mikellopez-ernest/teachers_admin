@@ -51,7 +51,7 @@ The DB spreadsheet also has a `leave_absence` sheet with `row_id`, `teacher_code
 - Clicking a teacher-name hyperlink opens a Bootstrap-organized detail window.
 - Detail windows can be changed to edit forms with the same block structure using `Edit`, then saved or cancelled.
 - No delete option is provided.
-- `Donar de baixa` / `Donar d'alta` manages one selected teacher at a time, updates absent-teacher column O, records dates/substitute/comments in `leave_absence`, marks the substitute with `SUBST?` and `ACTIU`, and clears those substitute flags when the leave ends.
+- `Donar de baixa` / `Donar d'alta` manages one selected teacher at a time, updates absent-teacher column O, records dates/substitute/comments in `leave_absence`, marks the substitute with `SUBST?` and `ACTIU`, and clears those substitute flags when the leave ends. Substitute candidates need a `REDUIT` code and must not already be `BAIXA?` or `SUBST?`; the absent teacher is excluded, but teachers with the same `ESP` remain available.
 - Starting or ending a leave calls the Horaris schedule cache rebuild endpoint with JSON POST `action=rebuildScheduleCache`.
 - `Desactivar` / `Activar` updates column N.
 - `Exportar` opens export options for selected rows: spreadsheet-compatible CSV, a browser-generated PDF signature list, or PDF teacher stickers.

@@ -1078,7 +1078,7 @@
         elements.leaveModalBody.appendChild(form);
         const substituteSelect = form.querySelector('#leaveSubstitute');
         state.substitutes.forEach((substitute) => {
-          if (substitute.esp === row.esp || substitute.code === row.reduit) return;
+          if (substitute.code === row.reduit) return;
           const option = document.createElement('option');
           option.value = substitute.code;
           option.textContent = substitute.name;
