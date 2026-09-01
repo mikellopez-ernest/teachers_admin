@@ -37,7 +37,7 @@ Only rows where `ACTIU` column N is true are shown.
 
 The `Per classe` view reads script property `db` as the registry spreadsheet ID, finds `Càrrega lectiva` in `tables`, and opens its `distribucio` sheet.
 
-It builds a class combo from `Curs` and `Grup`, expands comma-separated groups and `TOTS`, and displays unique teacher/subject pairs for the selected class. Teacher order follows the order in `distribucio`. It enriches teachers with `CORREU INSTIT` by matching `distribucio` row 2 teacher names against `Càrrega lectiva -> professors` column Q and reading email from column L.
+It builds a two-level selectable class combo from `Curs` and `Grup`, with level options such as `1ESO` and indented group options such as `--- 1ESO A`. Selecting a level shows all teacher/subject pairs involved in that full level; selecting an indented group shows only that class. It expands comma-separated groups and `TOTS`, keeps teacher order from `distribucio`, and enriches teachers with `CORREU INSTIT` by matching `distribucio` row 2 teacher names against `Càrrega lectiva -> professors` column Q and reading email from column L.
 
 The view is strictly read-only.
 

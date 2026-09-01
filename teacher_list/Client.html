@@ -124,14 +124,16 @@
     const currentValue = elements.classFilter.value;
     elements.classFilter.innerHTML = '<option value="">Selecciona una classe</option>';
 
-    state.classOptions.forEach((label) => {
+    state.classOptions.forEach((classOption) => {
       const option = document.createElement('option');
-      option.value = label;
-      option.textContent = label;
+      option.value = classOption.value;
+      option.textContent = classOption.label;
       elements.classFilter.appendChild(option);
     });
 
-    elements.classFilter.value = state.classOptions.includes(currentValue) ? currentValue : '';
+    elements.classFilter.value = state.classOptions.some((classOption) => classOption.value === currentValue)
+      ? currentValue
+      : '';
   }
 
   function loadTeachersForSelectedClass() {

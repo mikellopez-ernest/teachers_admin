@@ -227,7 +227,7 @@ function createClassTeachersXlsx(classLabel) {
       fileName,
       mimeType: CONFIG.xlsxMimeType,
       base64: Utilities.base64Encode(response.getBlob().getBytes()),
-      message: `S'ha exportat el llistat de ${classLabel}.`,
+      message: `S'ha exportat el llistat de ${parsedClass.displayLabel}.`,
     };
   } finally {
     tempFile.setTrashed(true);
@@ -340,17 +340,38 @@ function findLessonHeaderRow_(values) {
 }
 
 function buildClassOptions_(values, headerRowIndex) {
-  const labels = new Set();
+  const groupsByCourse = new Map();
 
   values.slice(headerRowIndex + 1).forEach((row) => {
     const course = valueToString_(row[DISTRIBUCIO_COLUMNS.course - 1]);
     const groupValue = valueToString_(row[DISTRIBUCIO_COLUMNS.group - 1]);
     if (!course || !groupValue) return;
 
-    expandGroups_(course, groupValue).forEach((group) => labels.add(course + ' ' + group));
+    if (!groupsByCourse.has(course)) groupsByCourse.set(course, new Set());
+    expandGroups_(course, groupValue).forEach((group) => groupsByCourse.get(course).add(group));
   });
 
-  return [...labels].sort(compareClassLabels_);
+  return [...groupsByCourse.keys()]
+    .sort(compareCourses_)
+    .flatMap((course) => {
+      const groups = [...groupsByCourse.get(course)].sort(compareText_);
+      return [
+        {
+          value: buildClassSelectionValue_({ type: 'level', course }),
+          label: course,
+          type: 'level',
+          course,
+          group: '',
+        },
+        ...groups.map((group) => ({
+          value: buildClassSelectionValue_({ type: 'group', course, group }),
+          label: '--- ' + course + ' ' + group,
+          type: 'group',
+          course,
+          group,
+        })),
+      ];
+    });
 }
 
 function getMatchingLessonRows_(values, parsedClass, headerRowIndex) {
@@ -358,6 +379,7 @@ function getMatchingLessonRows_(values, parsedClass, headerRowIndex) {
     const course = valueToString_(row[DISTRIBUCIO_COLUMNS.course - 1]);
     const groupValue = valueToString_(row[DISTRIBUCIO_COLUMNS.group - 1]);
     if (course !== parsedClass.course || !groupValue) return false;
+    if (parsedClass.type === 'level') return true;
     return expandGroups_(course, groupValue).includes(parsedClass.group);
   });
 }
@@ -378,6 +400,31 @@ function expandGroups_(course, groupValue) {
 
 function parseClassLabel_(classLabel) {
   const label = valueToString_(classLabel);
+
+  if (label.indexOf('level:') === 0) {
+    const course = valueToString_(label.slice('level:'.length));
+    if (!course) throw new Error('Etiqueta de classe no valida.');
+    return {
+      type: 'level',
+      course,
+      group: '',
+      displayLabel: course,
+    };
+  }
+
+  if (label.indexOf('group:') === 0) {
+    const parts = label.slice('group:'.length).split('|');
+    const course = valueToString_(parts[0]);
+    const group = valueToString_(parts[1]);
+    if (!course || !group) throw new Error('Etiqueta de classe no valida.');
+    return {
+      type: 'group',
+      course,
+      group,
+      displayLabel: course + ' ' + group,
+    };
+  }
+
   const match = label.match(/^(.+)\s+(\S+)$/);
 
   if (!match) {
@@ -385,8 +432,10 @@ function parseClassLabel_(classLabel) {
   }
 
   return {
+    type: 'group',
     course: valueToString_(match[1]),
     group: valueToString_(match[2]),
+    displayLabel: valueToString_(match[1]) + ' ' + valueToString_(match[2]),
   };
 }
 
@@ -407,15 +456,35 @@ function compareClassLabels_(a, b) {
 
 function parseClassLabelForSort_(label) {
   const parsed = parseClassLabel_(label);
-  const match = parsed.course.match(/^(\d+)(ESO|BAT)$/i);
-  const kind = match ? match[2].toLocaleUpperCase('ca') : parsed.course;
+  return getCourseSortParts_(parsed.course, parsed.group);
+}
+
+function compareCourses_(a, b) {
+  const parsedA = getCourseSortParts_(a, '');
+  const parsedB = getCourseSortParts_(b, '');
+
+  return parsedA.stage - parsedB.stage
+    || parsedA.number - parsedB.number
+    || compareText_(parsedA.kind, parsedB.kind)
+    || compareText_(a, b);
+}
+
+function getCourseSortParts_(course, group) {
+  const normalizedCourse = valueToString_(course);
+  const match = normalizedCourse.match(/^(\d+)(ESO|BAT)$/i);
+  const kind = match ? match[2].toLocaleUpperCase('ca') : normalizedCourse;
 
   return {
     stage: kind === 'ESO' ? 1 : kind === 'BAT' ? 2 : 3,
     number: match ? Number(match[1]) : 999,
     kind,
-    group: parsed.group,
+    group,
   };
+}
+
+function buildClassSelectionValue_(selection) {
+  if (selection.type === 'level') return 'level:' + selection.course;
+  return 'group:' + selection.course + '|' + selection.group;
 }
 
 function getTeacherDbSpreadsheet_() {
@@ -550,9 +619,10 @@ function buildStructureFileName_() {
 }
 
 function buildClassTeachersXlsxModel_(rows, parsedClass) {
+  const selectionLabel = parsedClass.displayLabel || parsedClass.course + (parsedClass.group ? ' ' + parsedClass.group : '');
   return {
     title: 'Professorat per classe',
-    subtitle: `Classe: ${parsedClass.course} ${parsedClass.group} · Resultats: ${rows.length} · Generat: ${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')}`,
+    subtitle: `Classe: ${selectionLabel} · Resultats: ${rows.length} · Generat: ${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')}`,
     headers: ['Teacher', 'Subject', 'CORREU INSTIT'],
     rows: rows.map((row) => [row.teacherName, row.subject, row.correuInstit]),
     columnWidths: [240, 260, 300],
@@ -563,7 +633,7 @@ function buildClassTeachersXlsxModel_(rows, parsedClass) {
 
 function buildClassTeachersFileName_(parsedClass) {
   const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmm');
-  const classPart = sanitizeFileName_(parsedClass.course + '-' + parsedClass.group);
+  const classPart = sanitizeFileName_(parsedClass.displayLabel || parsedClass.course + '-' + parsedClass.group);
   return `professorat-${classPart}-${stamp}.xlsx`;
 }
 

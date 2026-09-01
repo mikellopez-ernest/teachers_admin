@@ -108,11 +108,14 @@ Class combo generation:
 2. Read rows below that header.
 3. Read `Curs` from column A and `Grup` from column B.
 4. Skip rows where `Curs` or `Grup` is empty.
-5. Build class labels as `Curs + " " + Grup`.
+5. Build one selectable level option for each `Curs`.
 6. Expand comma-separated groups into individual labels.
 7. Expand `TOTS` using known groups.
 8. Remove duplicates.
 9. Sort naturally: ESO first, BAT next, other groups last; within each stage, by course number and group.
+10. Display the combo with selectable two-level indentation:
+   - level options are shown as `1ESO`;
+   - group options are shown under the level as `--- 1ESO A`.
 
 Known `TOTS` expansion:
 
@@ -123,20 +126,23 @@ Known `TOTS` expansion:
 - `1BAT`: `A`, `B`, `C`;
 - `2BAT`: `A`, `B`.
 
-When a class is selected:
+When a class/group is selected:
 
-1. Parse the selected label into course and group.
-2. Keep rows where column A matches course and column B includes the selected group.
-3. A row matches when `Grup` exactly equals the group, is comma-separated and includes it, or is `TOTS` and the selected group belongs to the course's known groups.
-4. For each matching row, read subject from column C.
-5. Scan columns M onward.
-6. If an allocation cell is numeric and greater than 0, row 2 of that column is the teacher for that subject.
-7. Collapse duplicate teacher/subject pairs using key `teacherName + "::" + subject`.
-8. Keep result order from `distribucio`: lesson rows are read top-to-bottom, and teacher allocations are scanned from column M onward.
+1. Parse the selected option into either:
+   - a level selection with course only;
+   - a group selection with course and group.
+2. For a level selection, keep all rows where column A matches the selected course.
+3. For a group selection, keep rows where column A matches course and column B includes the selected group.
+4. A group row matches when `Grup` exactly equals the group, is comma-separated and includes it, or is `TOTS` and the selected group belongs to the course's known groups.
+5. For each matching row, read subject from column C.
+6. Scan columns M onward.
+7. If an allocation cell is numeric and greater than 0, row 2 of that column is the teacher for that subject.
+8. Collapse duplicate teacher/subject pairs using key `teacherName + "::" + subject`.
+9. Keep result order from `distribucio`: lesson rows are read top-to-bottom, and teacher allocations are scanned from column M onward.
 
 Display:
 
-- combo box with all classes/groups;
+- combo box with selectable levels and indented classes/groups;
 - results table with columns `Teacher`, `Subject`, and `CORREU INSTIT`;
 - if no class is selected, show no results;
 - if a class has no rows, show `No teachers found for this class.`.
