@@ -119,6 +119,7 @@ The status filters are displayed as two rows: row 1 has `Actius`, `No actius`, a
 - Every displayed table header is clickable.
 - Clicking a header sorts the table by that displayed column.
 - Clicking `NOM SENCER` sorts by first surname, then second surname, then name.
+- Row data sent to the browser includes raw `NOM`, `COGNOM1`, and `COGNOM2` fields so exports can compose names differently from the visible `NOM SENCER`.
 - First click sorts A-Z.
 - Clicking the same header again toggles to Z-A.
 - Sorting should apply to the currently filtered rows.

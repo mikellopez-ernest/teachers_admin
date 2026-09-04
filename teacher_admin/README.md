@@ -46,6 +46,7 @@ The DB spreadsheet also has a `leave_absence` sheet with `row_id`, `teacher_code
 - `RESET` clears only the department and name filters.
 - Clickable table headers toggle A-Z / Z-A sorting.
 - `NOM SENCER` displays name plus surnames, but sorts by first surname.
+- Browser row data also includes raw `NOM`, `COGNOM1`, and `COGNOM2` values for export formats that need a different name order.
 - Row checkboxes select rows for bulk updates.
 - Header checkbox selects or deselects all currently filtered rows.
 - Clicking a teacher-name hyperlink opens a Bootstrap-organized detail window.
