@@ -272,7 +272,8 @@ If no rows are selected, clicking an action button shows a warning and does not 
 - Teacher names are sorted alphabetically by first surname, using the same sort key as `NOM SENCER`.
 - The PDF contains a table with 2 columns and 15 rows per page.
 - The PDF has no header row and no title text.
-- Each cell contains one teacher full name from DB columns C, D, and E.
+- Each cell contains one teacher name from DB columns D, E, and C, composed as `COGNOM1 COGNOM2 NOM`.
+- Teacher names are rendered in uppercase.
 - Teacher names are horizontally and vertically centered in each cell.
 - Blank cells are allowed on the final page when the selected-teacher count is odd.
 - The PDF is generated in the browser and downloaded to the user's computer.

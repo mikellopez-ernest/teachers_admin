@@ -1354,7 +1354,8 @@
         const names = selectedRows
           .filter((row) => row.fullName)
           .sort((a, b) => compareRows(a, b, 'fullName'))
-          .map((row) => row.fullName);
+          .map(formatLabelTeacherName)
+          .filter(Boolean);
 
         if (!names.length) {
           elements.exportResult.textContent = 'No hi ha noms per generar les etiquetes.';
@@ -1429,6 +1430,13 @@
         link.click();
         link.remove();
         URL.revokeObjectURL(url);
+      }
+
+      function formatLabelTeacherName(row) {
+        return [row.cognom1, row.cognom2, row.nom]
+          .filter(Boolean)
+          .join(' ')
+          .toLocaleUpperCase('ca');
       }
 
       function compareRows(a, b, key) {
