@@ -57,7 +57,7 @@ The DB spreadsheet also has a `leave_absence` sheet with `row_id`, `teacher_code
 - `Desactivar` / `Activar` updates column N.
 - `Exportar` opens export options for selected rows: spreadsheet-compatible CSV, a browser-generated PDF signature list, or PDF teacher stickers.
 - The signature list includes only selected teachers, sorted by first surname, with columns for teacher name, signature, and observations.
-- `Etiquetes` creates a selected-teacher PDF with two columns and fifteen rows per page, with each teacher name centered in its cell as uppercase `COGNOM1 COGNOM2 NOM`.
+- `Etiquetes` creates a selected-teacher PDF with two columns and fifteen rows per page, with each teacher name centered in its cell as uppercase `COGNOM1 COGNOM2, NOM`.
 - Rows with `SUBST?` checked are shown in slight green; leave-of-absence rows are shown in slight red.
 - Action buttons warn if no row is selected.
 - `BAIXA?` is read-only in the teacher edit form and is only changed through the leave workflow.

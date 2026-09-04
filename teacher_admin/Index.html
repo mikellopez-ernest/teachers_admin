@@ -1433,10 +1433,12 @@
       }
 
       function formatLabelTeacherName(row) {
-        return [row.cognom1, row.cognom2, row.nom]
+        const surnames = [row.cognom1, row.cognom2]
           .filter(Boolean)
           .join(' ')
           .toLocaleUpperCase('ca');
+        const name = String(row.nom || '').toLocaleUpperCase('ca');
+        return [surnames, name].filter(Boolean).join(', ');
       }
 
       function compareRows(a, b, key) {
