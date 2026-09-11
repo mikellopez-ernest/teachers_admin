@@ -4,7 +4,7 @@ Google Apps Script web app for read-only teacher list endpoints.
 
 ## Access Control
 
-The web app is deployed for `iernestlluch.cat` domain users only and then applies a second server-side authorization check.
+The web app is deployed for `iernestlluch.cat` domain users only, executes as the accessing user, and then applies a second server-side authorization check.
 
 Required script property:
 

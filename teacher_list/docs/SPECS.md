@@ -5,7 +5,7 @@
 - Script folder: `teacher_list`.
 - Apps Script project ID: `1xJW2r9kBZHib0bKVPZuNo-rXUNofZKy5-F6T6Zy4OLrb5CIHu1QcOTw5`.
 - The project is deployed as a web app endpoint.
-- Web app execution: owner/deployer, `admindomini@iernestlluch.cat`.
+- Web app execution: user accessing the web app, so the authorization check sees the visitor's email.
 - Web app access: domain users only. The deployment must be restricted to users in `iernestlluch.cat`.
 
 ## File Structure
@@ -23,7 +23,7 @@
 
 The app has two access layers:
 
-1. Apps Script web app access is restricted to the `iernestlluch.cat` domain.
+1. Apps Script web app access is restricted to the `iernestlluch.cat` domain and executes as the accessing user.
 2. Server-side authorization checks the signed-in user's institutional email against roles configured in script properties.
 
 Required script property:
