@@ -2,6 +2,25 @@
 
 Google Apps Script web app for read-only teacher list endpoints.
 
+## Access Control
+
+The web app is deployed for `iernestlluch.cat` domain users only and then applies a second server-side authorization check.
+
+Required script property:
+
+- `access_granted`: comma-separated list of allowed càrrecs, for example `Coord. 3ESO,COCOBE`.
+
+How authorization is resolved:
+
+1. The app reads the signed-in user's email.
+2. It reads `access_granted`.
+3. It opens `Càrrega lectiva -> carrecs` and matches each configured càrrec against column A.
+4. It reads assigned people from column D (`asignado?`), split by commas.
+5. It opens `Càrrega lectiva -> professors`, matches each person against column Q, and reads `CORREU INSTIT` from column L.
+6. Access is granted only if the signed-in user's email is one of those resolved emails.
+
+The reusable authorization helper block is isolated in `Code.js` with `getAccessDecision_()`, `assertUserAccess_()`, `getAccessGrantedRoles_()`, `getPeopleByAccessRole_()`, `getEmailsForPeople_()`, and `createAccessDeniedOutput_()`.
+
 ## Views
 
 - `Llistat`: active-teacher list with name and department filters.
@@ -65,6 +84,7 @@ Run `grantRequiredPermissions()` manually from the Apps Script editor to grant a
 Required script property:
 
 - `db`: registry spreadsheet ID.
+- `access_granted`: comma-separated list of allowed càrrecs.
 
 ## Local Development
 
