@@ -11,11 +11,12 @@ The web app should:
 1. Be reachable only by users from the `iernestlluch.cat` domain.
 2. Read the signed-in user's email.
 3. Read a script property named `access_granted`.
-4. Resolve the allowed roles/càrrecs into people.
-5. Resolve those people into institutional email addresses.
-6. Allow access only if the signed-in user's email is in that resolved list.
-7. Show a no-access page otherwise.
-8. Protect server-side methods too, not only `doGet()`.
+4. Accept direct email entries immediately.
+5. Resolve non-email roles/càrrecs into people.
+6. Resolve those people into institutional email addresses.
+7. Allow access only if the signed-in user's email is in the direct or resolved email list.
+8. Show a no-access page otherwise.
+9. Protect server-side methods too, not only `doGet()`.
 
 ## Script Property
 
@@ -25,15 +26,15 @@ Create this Apps Script property in the script that needs protection:
 access_granted
 ```
 
-Its value is a comma-separated list of allowed càrrecs.
+Its value is a comma-separated list of allowed càrrecs and/or direct institutional email addresses.
 
 Example:
 
 ```text
-Coord. 3ESO,COCOBE
+Coord. 3ESO,COCOBE,mikellopez@iernestlluch.cat
 ```
 
-The names must match `Càrrega lectiva -> carrecs` column A.
+Entries containing `@` are treated as direct allowed emails and do not need a lookup. Other entries are treated as càrrecs and must match `Càrrega lectiva -> carrecs` column A.
 
 ## Data Sources
 
@@ -60,7 +61,7 @@ Required columns:
 | A | `carrec` |
 | D | `asignado?` |
 
-For each role in `access_granted`, find the row where column A matches exactly. Then read column D.
+For each non-email role in `access_granted`, find the row where column A matches exactly. Then read column D.
 
 Column D can contain one person or multiple people separated by commas.
 
@@ -152,8 +153,8 @@ function getAccessDecision_() {
       };
     }
 
-    const roles = getAccessGrantedRoles_();
-    if (roles.length === 0) {
+    const accessEntries = getAccessGrantedRoles_();
+    if (accessEntries.length === 0) {
       return {
         allowed: false,
         email: userEmail,
@@ -161,6 +162,10 @@ function getAccessDecision_() {
       };
     }
 
+    const directEmails = accessEntries
+      .map(normalizeEmail_)
+      .filter((entry) => entry.indexOf('@') !== -1);
+    const roles = accessEntries.filter((entry) => normalizeEmail_(entry).indexOf('@') === -1);
     const peopleByRole = getPeopleByAccessRole_();
     const people = [];
     roles.forEach((role) => {
@@ -169,12 +174,15 @@ function getAccessDecision_() {
     });
 
     const authorizedEmails = getEmailsForPeople_(people);
+    directEmails.forEach((email) => authorizedEmails.add(email));
     const allowed = authorizedEmails.has(userEmail);
 
     return {
       allowed,
       email: userEmail,
+      accessEntries,
       roles,
+      directEmails,
       people,
       message: allowed
         ? 'Acces autoritzat.'
@@ -498,7 +506,7 @@ function grantRequiredPermissions() {
 
 ## Checklist For A New Script
 
-1. Add `access_granted` script property.
+1. Add `access_granted` script property with càrrecs and/or direct emails.
 2. Ensure the script can resolve `Càrrega lectiva` from the registry.
 3. Add config constants for:
    - `accessGrantedPropertyName`;
@@ -533,7 +541,7 @@ Check:
 - the user is testing the deployed `/exec` URL, not an old `/dev` URL;
 - `doGet()` calls `getAccessDecision_()`;
 - all `google.script.run` methods call `assertUserAccess_()`;
-- the user is not accidentally included through another role in `access_granted`.
+- the user is not accidentally included through another role or direct email in `access_granted`.
 
 ### Active user email is blank
 
@@ -547,7 +555,8 @@ Check:
 
 Check:
 
-- the càrrec text in `access_granted` exactly matches `carrecs` column A, ignoring accents/case only after normalization;
+- direct email entries in `access_granted` are correctly spelled;
+- non-email càrrec entries in `access_granted` exactly match `carrecs` column A, ignoring accents/case only after normalization;
 - the assigned person in `carrecs` column D matches `professors` column Q after normalization;
 - `professors` column L has the correct institutional email;
 - column D names are separated by commas, not semicolons.

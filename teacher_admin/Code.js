@@ -106,8 +106,8 @@ function getAccessDecision_() {
       };
     }
 
-    const roles = getAccessGrantedRoles_();
-    if (roles.length === 0) {
+    const accessEntries = getAccessGrantedRoles_();
+    if (accessEntries.length === 0) {
       return {
         allowed: false,
         email: userEmail,
@@ -115,6 +115,10 @@ function getAccessDecision_() {
       };
     }
 
+    const directEmails = accessEntries
+      .map(normalizeEmail_)
+      .filter((entry) => entry.indexOf('@') !== -1);
+    const roles = accessEntries.filter((entry) => normalizeEmail_(entry).indexOf('@') === -1);
     const peopleByRole = getPeopleByAccessRole_();
     const people = [];
     roles.forEach((role) => {
@@ -123,12 +127,15 @@ function getAccessDecision_() {
     });
 
     const authorizedEmails = getEmailsForPeople_(people);
+    directEmails.forEach((email) => authorizedEmails.add(email));
     const allowed = authorizedEmails.has(userEmail);
 
     return {
       allowed,
       email: userEmail,
+      accessEntries,
       roles,
+      directEmails,
       people,
       message: allowed
         ? 'Acces autoritzat.'

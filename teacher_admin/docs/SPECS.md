@@ -15,20 +15,22 @@ The endpoint has two access layers:
 
 Required script property:
 
-- `access_granted`: comma-separated list of allowed càrrecs. Example: `Coord. 3ESO,COCOBE`.
+- `access_granted`: comma-separated list of allowed càrrecs and/or direct emails. Example: `Coord. 3ESO,COCOBE,mikellopez@iernestlluch.cat`.
 
 Authorization flow:
 
 1. Read the active user's email with `Session.getActiveUser().getEmail()`.
 2. Read script property `access_granted` and split it by commas.
-3. Resolve the `Càrrega lectiva` spreadsheet through the `Tables` registry sheet `tables`.
-4. Open `Càrrega lectiva -> carrecs`.
-5. For each configured càrrec, find a matching row in column A (`carrec`).
-6. Read the assigned person names from column D (`asignado?`). Multiple people are comma-separated.
-7. Open `Càrrega lectiva -> professors`.
-8. Match each assigned person name against column Q.
-9. Read the matching institutional email from column L (`CORREU INSTIT`).
-10. Allow access only when the active user's email matches one resolved email.
+3. Treat entries containing `@` as direct allowed emails.
+4. Treat non-email entries as càrrecs.
+5. Resolve the `Càrrega lectiva` spreadsheet through the `Tables` registry sheet `tables`.
+6. Open `Càrrega lectiva -> carrecs`.
+7. For each configured càrrec, find a matching row in column A (`carrec`).
+8. Read the assigned person names from column D (`asignado?`). Multiple people are comma-separated.
+9. Open `Càrrega lectiva -> professors`.
+10. Match each assigned person name against column Q.
+11. Read the matching institutional email from column L (`CORREU INSTIT`).
+12. Allow access only when the active user's email matches one direct or resolved email.
 
 If access is denied, `doGet()` renders a simple no-access page. Each server-side data, edit, status, leave, and export function also calls the same authorization helper before returning data or writing DB.
 
