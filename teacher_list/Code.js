@@ -1,6 +1,5 @@
 const CONFIG = {
   registryPropertyName: 'db',
-  accessGrantedPropertyName: 'access_granted',
   registrySheetName: 'tables',
   teacherDbName: 'Dades de professors',
   workloadDbName: 'Càrrega lectiva',
@@ -48,9 +47,6 @@ const KNOWN_GROUPS = {
 };
 
 function doGet() {
-  const access = getAccessDecision_();
-  if (!access.allowed) return createAccessDeniedOutput_(access);
-
   return HtmlService
     .createTemplateFromFile('Index')
     .evaluate()
@@ -62,178 +58,9 @@ function include_(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-function assertUserAccess_() {
-  const access = getAccessDecision_();
-  if (!access.allowed) {
-    throw new Error(access.message);
-  }
-  return access;
-}
-
-function getAccessDecision_() {
-  try {
-    const userEmail = normalizeEmail_(Session.getActiveUser().getEmail());
-    if (!userEmail) {
-      return {
-        allowed: false,
-        email: '',
-        message: 'No s\'ha pogut identificar el correu de l\'usuari actiu.',
-      };
-    }
-
-    const roles = getAccessGrantedRoles_();
-    if (roles.length === 0) {
-      return {
-        allowed: false,
-        email: userEmail,
-        message: `Falta configurar la propietat de script "${CONFIG.accessGrantedPropertyName}".`,
-      };
-    }
-
-    const peopleByRole = getPeopleByAccessRole_();
-    const people = [];
-    roles.forEach((role) => {
-      const assignedPeople = peopleByRole.get(normalizeText_(role)) || [];
-      assignedPeople.forEach((person) => people.push(person));
-    });
-
-    const authorizedEmails = getEmailsForPeople_(people);
-    const allowed = authorizedEmails.has(userEmail);
-
-    return {
-      allowed,
-      email: userEmail,
-      roles,
-      people,
-      message: allowed
-        ? 'Acces autoritzat.'
-        : 'No tens permisos per accedir a aquesta aplicacio.',
-    };
-  } catch (error) {
-    return {
-      allowed: false,
-      email: normalizeEmail_(Session.getActiveUser().getEmail()),
-      message: error && error.message ? error.message : String(error),
-    };
-  }
-}
-
-function getAccessGrantedRoles_() {
-  const rawValue = PropertiesService
-    .getScriptProperties()
-    .getProperty(CONFIG.accessGrantedPropertyName);
-
-  return splitCommaList_(rawValue);
-}
-
-function getPeopleByAccessRole_() {
-  const sheet = getWorkloadCarrecsSheet_();
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return new Map();
-
-  const values = sheet.getRange(2, 1, lastRow - 1, CARRECS_COLUMNS.asignado).getValues();
-  const peopleByRole = new Map();
-
-  values.forEach((row) => {
-    const roleName = valueToString_(row[CARRECS_COLUMNS.carrec - 1]);
-    if (!roleName) return;
-
-    const assignedPeople = splitCommaList_(row[CARRECS_COLUMNS.asignado - 1]);
-    peopleByRole.set(normalizeText_(roleName), assignedPeople);
-  });
-
-  return peopleByRole;
-}
-
-function getEmailsForPeople_(people) {
-  const sheet = getWorkloadProfessorsSheet_();
-  const lastRow = sheet.getLastRow();
-  const emails = new Set();
-  if (lastRow < 2 || people.length === 0) return emails;
-
-  const peopleSet = new Set(people.map((person) => normalizeText_(person)));
-  const values = sheet.getRange(2, 1, lastRow - 1, WORKLOAD_PROFESSORS_COLUMNS.teacherKey).getValues();
-
-  values.forEach((row) => {
-    const teacherKey = normalizeText_(row[WORKLOAD_PROFESSORS_COLUMNS.teacherKey - 1]);
-    if (!peopleSet.has(teacherKey)) return;
-
-    const email = normalizeEmail_(row[WORKLOAD_PROFESSORS_COLUMNS.correuInstit - 1]);
-    if (email) emails.add(email);
-  });
-
-  people.forEach((person) => {
-    const directEmail = normalizeEmail_(person);
-    if (directEmail.indexOf('@') !== -1) emails.add(directEmail);
-  });
-
-  return emails;
-}
-
-function createAccessDeniedOutput_(access) {
-  const email = access && access.email ? access.email : 'usuari no identificat';
-  const message = access && access.message
-    ? access.message
-    : 'No tens permisos per accedir a aquesta aplicacio.';
-
-  return HtmlService
-    .createHtmlOutput(`
-      <!doctype html>
-      <html lang="ca">
-        <head>
-          <base target="_top">
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <title>Acces no autoritzat</title>
-          <style>
-            body {
-              margin: 0;
-              min-height: 100vh;
-              display: grid;
-              place-items: center;
-              font-family: Arial, sans-serif;
-              background: #f5f7fb;
-              color: #17202a;
-            }
-            main {
-              width: min(520px, calc(100vw - 32px));
-              border: 1px solid #d8dee9;
-              background: #fff;
-              padding: 28px;
-              box-shadow: 0 18px 45px rgba(20, 31, 47, 0.12);
-            }
-            h1 {
-              margin: 0 0 12px;
-              font-size: 24px;
-            }
-            p {
-              margin: 8px 0;
-              line-height: 1.5;
-            }
-            .email {
-              font-family: monospace;
-              color: #465466;
-            }
-          </style>
-        </head>
-        <body>
-          <main>
-            <h1>Acces no autoritzat</h1>
-            <p>${escapeHtml_(message)}</p>
-            <p class="email">${escapeHtml_(email)}</p>
-          </main>
-        </body>
-      </html>
-    `)
-    .setTitle('Acces no autoritzat')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-}
-
 function grantRequiredPermissions() {
   const scriptProperties = PropertiesService.getScriptProperties();
   scriptProperties.getProperty(CONFIG.registryPropertyName);
-  scriptProperties.getProperty(CONFIG.accessGrantedPropertyName);
-  Session.getActiveUser().getEmail();
 
   const db = getTeacherDbSpreadsheet_();
   const sheet = getTeacherDbSheet_();
@@ -271,7 +98,6 @@ function grantRequiredPermissions() {
 }
 
 function getTeacherListData() {
-  assertUserAccess_();
   const rows = getActiveTeacherRows_({});
   const departments = [...new Set(rows.map((row) => row.dept).filter(Boolean))]
     .sort((a, b) => compareText_(a, b));
@@ -283,14 +109,12 @@ function getTeacherListData() {
 }
 
 function getStructureData() {
-  assertUserAccess_();
   return {
     rows: getStructureRows_({}),
   };
 }
 
 function createStructureXlsx(filters) {
-  assertUserAccess_();
   const normalizedFilters = normalizeStructureFilters_(filters || {});
   const rows = getStructureRows_(normalizedFilters);
   const model = buildStructureXlsxModel_(rows, normalizedFilters);
@@ -327,7 +151,6 @@ function createStructureXlsx(filters) {
 }
 
 function getClassOptions() {
-  assertUserAccess_();
   const sheet = getDistribucioSheet_();
   const values = sheet.getDataRange().getValues();
   const headerRowIndex = findLessonHeaderRow_(values);
@@ -341,7 +164,6 @@ function getClassOptions() {
 }
 
 function getTeachersForClass(classLabel) {
-  assertUserAccess_();
   const parsedClass = parseClassLabel_(classLabel);
   const sheet = getDistribucioSheet_();
   const values = sheet.getDataRange().getValues();
@@ -377,7 +199,6 @@ function getTeachersForClass(classLabel) {
 }
 
 function createClassTeachersXlsx(classLabel) {
-  assertUserAccess_();
   const parsedClass = parseClassLabel_(classLabel);
   const rows = getTeachersForClass(classLabel);
   const model = buildClassTeachersXlsxModel_(rows, parsedClass);
@@ -414,7 +235,6 @@ function createClassTeachersXlsx(classLabel) {
 }
 
 function createTeacherListXlsx(filters) {
-  assertUserAccess_();
   const normalizedFilters = normalizeFilters_(filters || {});
   const rows = getActiveTeacherRows_(normalizedFilters);
   const model = buildTeacherListXlsxModel_(rows, normalizedFilters);
@@ -926,26 +746,6 @@ function normalizeText_(value) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLocaleLowerCase('ca');
-}
-
-function normalizeEmail_(value) {
-  return valueToString_(value).toLocaleLowerCase('ca');
-}
-
-function splitCommaList_(value) {
-  return valueToString_(value)
-    .split(',')
-    .map((item) => valueToString_(item))
-    .filter(Boolean);
-}
-
-function escapeHtml_(value) {
-  return valueToString_(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 function valueToString_(value) {

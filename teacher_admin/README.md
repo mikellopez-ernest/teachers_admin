@@ -2,6 +2,25 @@
 
 Google Apps Script web app for reading professor data from a spreadsheet-based DB and managing status filters and teacher records.
 
+## Access Control
+
+The web app is restricted to `iernestlluch.cat` domain users and then applies a second server-side authorization check.
+
+Required script property:
+
+- `access_granted`: comma-separated list of allowed càrrecs, for example `Coord. 3ESO,COCOBE`.
+
+How authorization is resolved:
+
+1. The app reads the signed-in user's email.
+2. It reads `access_granted`.
+3. It opens `Càrrega lectiva -> carrecs` through the `Tables` registry and matches each configured càrrec against column A.
+4. It reads assigned people from column D (`asignado?`), split by commas.
+5. It opens `Càrrega lectiva -> professors`, matches each person against column Q, and reads `CORREU INSTIT` from column L.
+6. Access is granted only if the signed-in user's email is one of those resolved emails.
+
+The reusable authorization helper block is isolated in `Code.js` with `getAccessDecision_()`, `assertUserAccess_()`, `getAccessGrantedRoles_()`, `getPeopleByAccessRole_()`, `getEmailsForPeople_()`, and `createAccessDeniedOutput_()`.
+
 ## Data Model
 
 The script property `Tables` must contain the ID of a registry spreadsheet. That registry spreadsheet must have a sheet named `tables` where:
@@ -73,6 +92,7 @@ Detailed behavior is specified in [`docs/SPECS.md`](docs/SPECS.md).
 ## Script Properties
 
 - `Tables`: required registry spreadsheet ID.
+- `access_granted`: comma-separated list of allowed càrrecs.
 - `cache_rebuild_token`: required token sent in the JSON POST payload to the Horaris cache rebuild endpoint after starting or ending a leave.
 - `cache_rebuild_url`: optional override for the Horaris cache rebuild endpoint. If omitted, the app uses `https://script.google.com/macros/s/AKfycbyhSqCTkS27bDxsfILI64rlSMUTN5A7VbHGgpSf_G6efxrWfOuUKJULnN2rlMtHuWqwmA/exec`.
 

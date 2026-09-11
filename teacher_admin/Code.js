@@ -1,8 +1,12 @@
 const CONFIG = {
   tablesPropertyName: 'Tables',
+  accessGrantedPropertyName: 'access_granted',
   tablesSheetName: 'tables',
   dbRegistryName: 'Dades de professors',
+  workloadRegistryName: 'Càrrega lectiva',
   dbSheetName: 'Llista',
+  workloadProfessorsSheetName: 'professors',
+  workloadCarrecsSheetName: 'carrecs',
   leaveAbsenceSheetName: 'leave_absence',
   firstDataRow: 2,
   editableColumnCount: 16,
@@ -31,6 +35,16 @@ const CONFIG = {
     'response_text',
     'error',
   ],
+};
+
+const WORKLOAD_PROFESSORS_COLUMNS = {
+  correuInstit: 12,
+  teacherKey: 17,
+};
+
+const CARRECS_COLUMNS = {
+  carrec: 1,
+  asignado: 4,
 };
 
 const DB_COLUMNS = [
@@ -64,13 +78,184 @@ const DB_COLUMNS = [
 ];
 
 function doGet() {
+  const access = getAccessDecision_();
+  if (!access.allowed) return createAccessDeniedOutput_(access);
+
   return HtmlService.createTemplateFromFile('Index')
     .evaluate()
     .setTitle('Dades de professors')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+function assertUserAccess_() {
+  const access = getAccessDecision_();
+  if (!access.allowed) {
+    throw new Error(access.message);
+  }
+  return access;
+}
+
+function getAccessDecision_() {
+  try {
+    const userEmail = normalizeEmail_(Session.getActiveUser().getEmail());
+    if (!userEmail) {
+      return {
+        allowed: false,
+        email: '',
+        message: 'No s\'ha pogut identificar el correu de l\'usuari actiu.',
+      };
+    }
+
+    const roles = getAccessGrantedRoles_();
+    if (roles.length === 0) {
+      return {
+        allowed: false,
+        email: userEmail,
+        message: `Falta configurar la propietat de script "${CONFIG.accessGrantedPropertyName}".`,
+      };
+    }
+
+    const peopleByRole = getPeopleByAccessRole_();
+    const people = [];
+    roles.forEach((role) => {
+      const assignedPeople = peopleByRole.get(normalizeText_(role)) || [];
+      assignedPeople.forEach((person) => people.push(person));
+    });
+
+    const authorizedEmails = getEmailsForPeople_(people);
+    const allowed = authorizedEmails.has(userEmail);
+
+    return {
+      allowed,
+      email: userEmail,
+      roles,
+      people,
+      message: allowed
+        ? 'Acces autoritzat.'
+        : 'No tens permisos per accedir a aquesta aplicacio.',
+    };
+  } catch (error) {
+    return {
+      allowed: false,
+      email: normalizeEmail_(Session.getActiveUser().getEmail()),
+      message: error && error.message ? error.message : String(error),
+    };
+  }
+}
+
+function getAccessGrantedRoles_() {
+  return splitCommaList_(
+    PropertiesService.getScriptProperties().getProperty(CONFIG.accessGrantedPropertyName)
+  );
+}
+
+function getPeopleByAccessRole_() {
+  const sheet = getWorkloadCarrecsSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return new Map();
+
+  const values = sheet.getRange(2, 1, lastRow - 1, CARRECS_COLUMNS.asignado).getValues();
+  const peopleByRole = new Map();
+
+  values.forEach((row) => {
+    const roleName = toDisplayString_(row[CARRECS_COLUMNS.carrec - 1]);
+    if (!roleName) return;
+
+    peopleByRole.set(
+      normalizeText_(roleName),
+      splitCommaList_(row[CARRECS_COLUMNS.asignado - 1])
+    );
+  });
+
+  return peopleByRole;
+}
+
+function getEmailsForPeople_(people) {
+  const sheet = getWorkloadProfessorsSheet_();
+  const lastRow = sheet.getLastRow();
+  const emails = new Set();
+  if (lastRow < 2 || people.length === 0) return emails;
+
+  const peopleSet = new Set(people.map((person) => normalizeText_(person)));
+  const values = sheet.getRange(2, 1, lastRow - 1, WORKLOAD_PROFESSORS_COLUMNS.teacherKey).getValues();
+
+  values.forEach((row) => {
+    const teacherKey = normalizeText_(row[WORKLOAD_PROFESSORS_COLUMNS.teacherKey - 1]);
+    if (!peopleSet.has(teacherKey)) return;
+
+    const email = normalizeEmail_(row[WORKLOAD_PROFESSORS_COLUMNS.correuInstit - 1]);
+    if (email) emails.add(email);
+  });
+
+  people.forEach((person) => {
+    const directEmail = normalizeEmail_(person);
+    if (directEmail.indexOf('@') !== -1) emails.add(directEmail);
+  });
+
+  return emails;
+}
+
+function createAccessDeniedOutput_(access) {
+  const email = access && access.email ? access.email : 'usuari no identificat';
+  const message = access && access.message
+    ? access.message
+    : 'No tens permisos per accedir a aquesta aplicacio.';
+
+  return HtmlService
+    .createHtmlOutput(`
+      <!doctype html>
+      <html lang="ca">
+        <head>
+          <base target="_top">
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Acces no autoritzat</title>
+          <style>
+            body {
+              margin: 0;
+              min-height: 100vh;
+              display: grid;
+              place-items: center;
+              font-family: Arial, sans-serif;
+              background: #f5f7fb;
+              color: #17202a;
+            }
+            main {
+              width: min(520px, calc(100vw - 32px));
+              border: 1px solid #d8dee9;
+              background: #fff;
+              padding: 28px;
+              box-shadow: 0 18px 45px rgba(20, 31, 47, 0.12);
+            }
+            h1 {
+              margin: 0 0 12px;
+              font-size: 24px;
+            }
+            p {
+              margin: 8px 0;
+              line-height: 1.5;
+            }
+            .email {
+              font-family: monospace;
+              color: #465466;
+            }
+          </style>
+        </head>
+        <body>
+          <main>
+            <h1>Acces no autoritzat</h1>
+            <p>${escapeHtml_(message)}</p>
+            <p class="email">${escapeHtml_(email)}</p>
+          </main>
+        </body>
+      </html>
+    `)
+    .setTitle('Acces no autoritzat')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
 function getProfessorsData() {
+  assertUserAccess_();
   const sheet = getDbSheet_();
   const lastRow = sheet.getLastRow();
   const lastColumn = Math.max(sheet.getLastColumn(), CONFIG.substColumn);
@@ -107,14 +292,17 @@ function getProfessorsData() {
 }
 
 function updateBaixa() {
+  assertUserAccess_();
   throw new Error('La baixa nomes es pot gestionar amb el flux Donar de baixa / Donar d\'alta.');
 }
 
 function updateActiu(rowNumbers, value) {
+  assertUserAccess_();
   return updateBooleanColumn_(rowNumbers, CONFIG.activeColumn, value);
 }
 
 function startLeaveAbsence(rowNumber, leaveData) {
+  assertUserAccess_();
   const normalizedRowNumber = normalizeRowNumber_(rowNumber);
   const data = normalizeLeaveData_(leaveData, true);
   const lock = LockService.getScriptLock();
@@ -178,6 +366,7 @@ function startLeaveAbsence(rowNumber, leaveData) {
 }
 
 function endLeaveAbsence(rowNumber, leaveData) {
+  assertUserAccess_();
   const normalizedRowNumber = normalizeRowNumber_(rowNumber);
   const data = normalizeLeaveData_(leaveData, false);
   const lock = LockService.getScriptLock();
@@ -239,6 +428,7 @@ function endLeaveAbsence(rowNumber, leaveData) {
 }
 
 function getTeacherDetails(rowNumber) {
+  assertUserAccess_();
   const normalizedRowNumber = normalizeRowNumber_(rowNumber);
   const sheet = getDbSheet_();
   const values = sheet
@@ -269,6 +459,7 @@ function getTeacherDetails(rowNumber) {
 }
 
 function saveTeacherDetails(rowNumber, fields) {
+  assertUserAccess_();
   const normalizedRowNumber = normalizeRowNumber_(rowNumber);
 
   if (!fields || typeof fields !== 'object') {
@@ -307,6 +498,7 @@ function saveTeacherDetails(rowNumber, fields) {
 }
 
 function exportTeachers(rowNumbers) {
+  assertUserAccess_();
   const uniqueRows = normalizeRowNumbers_(rowNumbers);
   const sheet = getDbSheet_();
   const header = sheet
@@ -370,6 +562,36 @@ function ensureLeaveAbsenceHeader_(sheet) {
 }
 
 function getDbSpreadsheet_() {
+  return getRegisteredSpreadsheet_(CONFIG.dbRegistryName);
+}
+
+function getWorkloadSpreadsheet_() {
+  return getRegisteredSpreadsheet_(CONFIG.workloadRegistryName);
+}
+
+function getWorkloadProfessorsSheet_() {
+  const spreadsheet = getWorkloadSpreadsheet_();
+  const sheet = spreadsheet.getSheetByName(CONFIG.workloadProfessorsSheetName);
+
+  if (!sheet) {
+    throw new Error(`No s'ha trobat el full "${CONFIG.workloadProfessorsSheetName}" a Càrrega lectiva.`);
+  }
+
+  return sheet;
+}
+
+function getWorkloadCarrecsSheet_() {
+  const spreadsheet = getWorkloadSpreadsheet_();
+  const sheet = spreadsheet.getSheetByName(CONFIG.workloadCarrecsSheetName);
+
+  if (!sheet) {
+    throw new Error(`No s'ha trobat el full "${CONFIG.workloadCarrecsSheetName}" a Càrrega lectiva.`);
+  }
+
+  return sheet;
+}
+
+function getRegisteredSpreadsheet_(registryName) {
   const properties = PropertiesService.getScriptProperties();
   const tablesSpreadsheetId = String(
     properties.getProperty(CONFIG.tablesPropertyName) || ''
@@ -393,18 +615,18 @@ function getDbSpreadsheet_() {
   }
 
   const values = tablesSheet.getRange(1, 1, lastRow, 2).getValues();
-  const match = values.find((row) => row[0] === CONFIG.dbRegistryName);
+  const match = values.find((row) => row[0] === registryName);
 
   if (!match) {
     throw new Error(
-      `No s'ha trobat "${CONFIG.dbRegistryName}" al full "${CONFIG.tablesSheetName}".`
+      `No s'ha trobat "${registryName}" al full "${CONFIG.tablesSheetName}".`
     );
   }
 
   const dbSpreadsheetId = String(match[1] || '').trim();
 
   if (!dbSpreadsheetId) {
-    throw new Error(`La fila "${CONFIG.dbRegistryName}" no te ID a la columna B.`);
+    throw new Error(`La fila "${registryName}" no te ID a la columna B.`);
   }
 
   return SpreadsheetApp.openById(dbSpreadsheetId);
@@ -830,6 +1052,33 @@ function toDisplayString_(value) {
   }
 
   return String(value).trim();
+}
+
+function normalizeText_(value) {
+  return toDisplayString_(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('ca');
+}
+
+function normalizeEmail_(value) {
+  return toDisplayString_(value).toLocaleLowerCase('ca');
+}
+
+function splitCommaList_(value) {
+  return toDisplayString_(value)
+    .split(',')
+    .map((item) => toDisplayString_(item))
+    .filter(Boolean);
+}
+
+function escapeHtml_(value) {
+  return toDisplayString_(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function isTruthyValue_(value) {

@@ -6,6 +6,41 @@
 - **DB**: spreadsheet resolved from the Tables registry row where column A is `Dades de professors`; column B of that row contains the DB spreadsheet ID.
 - **Endpoint**: Apps Script web app endpoint that reads from DB and renders a responsive Bootstrap HTML page.
 
+## Access Control
+
+The endpoint has two access layers:
+
+1. Apps Script web app access is restricted to the `iernestlluch.cat` domain.
+2. Server-side authorization checks the signed-in user's institutional email against roles configured in script properties.
+
+Required script property:
+
+- `access_granted`: comma-separated list of allowed càrrecs. Example: `Coord. 3ESO,COCOBE`.
+
+Authorization flow:
+
+1. Read the active user's email with `Session.getActiveUser().getEmail()`.
+2. Read script property `access_granted` and split it by commas.
+3. Resolve the `Càrrega lectiva` spreadsheet through the `Tables` registry sheet `tables`.
+4. Open `Càrrega lectiva -> carrecs`.
+5. For each configured càrrec, find a matching row in column A (`carrec`).
+6. Read the assigned person names from column D (`asignado?`). Multiple people are comma-separated.
+7. Open `Càrrega lectiva -> professors`.
+8. Match each assigned person name against column Q.
+9. Read the matching institutional email from column L (`CORREU INSTIT`).
+10. Allow access only when the active user's email matches one resolved email.
+
+If access is denied, `doGet()` renders a simple no-access page. Each server-side data, edit, status, leave, and export function also calls the same authorization helper before returning data or writing DB.
+
+Reusable helper responsibilities:
+
+- `getAccessDecision_()`: resolves the active user and returns an authorization decision.
+- `assertUserAccess_()`: throws when the current user is not authorized.
+- `getAccessGrantedRoles_()`: reads and parses script property `access_granted`.
+- `getPeopleByAccessRole_()`: maps configured càrrecs from `carrecs` column A to assigned people in column D.
+- `getEmailsForPeople_()`: maps assigned people to institutional emails using `professors` columns Q and L.
+- `createAccessDeniedOutput_()`: returns the no-access HTML page.
+
 ## DB Resolution
 
 1. Read script property `Tables`.
