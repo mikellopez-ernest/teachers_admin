@@ -210,6 +210,19 @@ If no rows are selected, clicking an action button shows a warning and does not 
 - Confirming the modal sets `Llista` column P `SUBST?` to boolean `true` for the selected substitute teacher.
 - Confirming the modal sets `Llista` column N `ACTIU` to boolean `true` for the selected substitute teacher.
 - Confirming the modal appends a row to `leave_absence` with `row_id`, `teacher_code` from the absent teacher's `REDUIT` column F, `substitute_code` from the substitute teacher's `REDUIT` column F, `start_date`, blank `end_date`, and `comments`.
+- After DB writes are flushed, the app sends an email to `claustre@iernestlluch.cat` with subject `Nova incorporació`.
+- Email body:
+
+```text
+Hola a tots,
+A partir de demà s'incorpora en/na <<substitute_teacher>>, en substitució de <<original_teacher>>
+Benvingut/da!
+
+Salut,
+```
+
+- `<<substitute_teacher>>` and `<<original_teacher>>` use the full names composed from columns C, D, and E.
+- The Apps Script manifest must include `https://www.googleapis.com/auth/script.send_mail` so `MailApp` can send the notification.
 - After DB writes are flushed, the app calls the schedule cache rebuild endpoint with POST action `rebuildScheduleCache`.
 - After updating, refresh the visible data.
 

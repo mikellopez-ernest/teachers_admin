@@ -14,6 +14,8 @@ const CONFIG = {
   activeColumn: 14,
   baixaColumn: 15,
   substColumn: 16,
+  leaveNotificationRecipient: 'claustre@iernestlluch.cat',
+  leaveNotificationSubject: 'Nova incorporació',
   cacheRebuildUrlPropertyName: 'cache_rebuild_url',
   cacheRebuildTokenPropertyName: 'cache_rebuild_token',
   defaultCacheRebuildUrl: 'https://script.google.com/macros/s/AKfycbyhSqCTkS27bDxsfILI64rlSMUTN5A7VbHGgpSf_G6efxrWfOuUKJULnN2rlMtHuWqwmA/exec',
@@ -316,6 +318,7 @@ function startLeaveAbsence(rowNumber, leaveData) {
   lock.waitLock(30000);
   let result;
   let notificationContext;
+  let emailContext;
 
   try {
     const sheet = getDbSheet_();
@@ -341,6 +344,9 @@ function startLeaveAbsence(rowNumber, leaveData) {
     if (!substituteRowNumber) {
       throw new Error('El substitut seleccionat no es valid.');
     }
+    const substituteTeacher = sheet
+      .getRange(substituteRowNumber, 1, 1, CONFIG.editableColumnCount)
+      .getValues()[0];
 
     sheet.getRange(normalizedRowNumber, CONFIG.baixaColumn).setValue(true);
     sheet.getRange(substituteRowNumber, CONFIG.activeColumn).setValue(true);
@@ -357,6 +363,10 @@ function startLeaveAbsence(rowNumber, leaveData) {
     SpreadsheetApp.flush();
 
     result = { updatedRows: 1 };
+    emailContext = {
+      originalTeacherName: buildFullName_(teacher),
+      substituteTeacherName: buildFullName_(substituteTeacher),
+    };
     notificationContext = {
       event: 'startLeaveAbsence',
       rowNumber: normalizedRowNumber,
@@ -368,7 +378,23 @@ function startLeaveAbsence(rowNumber, leaveData) {
     lock.releaseLock();
   }
 
+  let emailError = null;
+  try {
+    sendLeaveAbsenceNotificationEmail_(
+      emailContext.originalTeacherName,
+      emailContext.substituteTeacherName
+    );
+  } catch (error) {
+    emailError = error;
+    console.error(JSON.stringify({
+      event: 'leaveAbsence.email.error',
+      context: notificationContext,
+      error: error && error.message ? error.message : String(error),
+    }));
+  }
+
   notifyScheduleCacheRebuild_(notificationContext);
+  if (emailError) throw emailError;
   return result;
 }
 
@@ -748,6 +774,28 @@ function getProfessorLookupValues_(sheet) {
   return sheet
     .getRange(CONFIG.firstDataRow, 1, lastRow - CONFIG.firstDataRow + 1, CONFIG.substColumn)
     .getValues();
+}
+
+function sendLeaveAbsenceNotificationEmail_(originalTeacherName, substituteTeacherName) {
+  const originalTeacher = toDisplayString_(originalTeacherName);
+  const substituteTeacher = toDisplayString_(substituteTeacherName);
+
+  if (!originalTeacher || !substituteTeacher) {
+    throw new Error('No es pot enviar el correu de baixa: falten noms de professorat.');
+  }
+
+  MailApp.sendEmail({
+    to: CONFIG.leaveNotificationRecipient,
+    subject: CONFIG.leaveNotificationSubject,
+    body: [
+      'Hola a tots,',
+      `A partir de demà s'incorpora en/na ${substituteTeacher}, en substitució de ${originalTeacher}`,
+      'Benvingut/da!',
+      '',
+      'Salut,',
+      '',
+    ].join('\n'),
+  });
 }
 
 function notifyScheduleCacheRebuild_(context) {
