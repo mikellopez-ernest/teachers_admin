@@ -223,6 +223,7 @@ Salut,
 
 - `<<substitute_teacher>>` and `<<original_teacher>>` use the full names composed from columns C, D, and E.
 - The Apps Script manifest must include `https://www.googleapis.com/auth/script.send_mail` so `MailApp` can send the notification.
+- Run `grantRequiredPermissions()` once from the Apps Script editor after installing this version and accept the authorization prompt. The helper calls `MailApp.getRemainingDailyQuota()` to grant email capability without sending a test email.
 - After DB writes are flushed, the app calls the schedule cache rebuild endpoint with POST action `rebuildScheduleCache`.
 - After updating, refresh the visible data.
 

@@ -88,6 +88,8 @@ The DB spreadsheet also has a `leave_absence` sheet with `row_id`, `teacher_code
 
 This project is connected to Apps Script with `clasp`.
 
+After installing the project or adding OAuth scopes, run `grantRequiredPermissions()` once from the Apps Script editor and accept the authorization prompt. The helper grants the services used by the app, including spreadsheet access, external HTTP requests, user identity, script properties, and email sending. Its mail check uses `MailApp.getRemainingDailyQuota()` and does not send a test message.
+
 The PDF exports are generated in the browser with jsPDF and jsPDF AutoTable loaded from CDN by `Index.html`.
 
 Detailed behavior is specified in [`docs/SPECS.md`](docs/SPECS.md).

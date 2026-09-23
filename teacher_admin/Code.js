@@ -89,6 +89,44 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+function grantRequiredPermissions() {
+  const properties = PropertiesService.getScriptProperties();
+  properties.getProperty(CONFIG.tablesPropertyName);
+  properties.getProperty(CONFIG.accessGrantedPropertyName);
+  properties.getProperty(CONFIG.cacheRebuildUrlPropertyName);
+  properties.getProperty(CONFIG.cacheRebuildTokenPropertyName);
+
+  const activeUserEmail = Session.getActiveUser().getEmail();
+  const dbSheet = getDbSheet_();
+  const leaveAbsenceSheet = getLeaveAbsenceSheet_();
+  const workloadProfessorsSheet = getWorkloadProfessorsSheet_();
+  const workloadCarrecsSheet = getWorkloadCarrecsSheet_();
+
+  dbSheet.getRange(1, 1).getValue();
+  leaveAbsenceSheet.getRange(1, 1).getValue();
+  workloadProfessorsSheet.getRange(1, 1).getValue();
+  workloadCarrecsSheet.getRange(1, 1).getValue();
+
+  UrlFetchApp.getRequest(CONFIG.defaultCacheRebuildUrl, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ action: 'permissionCheck' }),
+  });
+
+  const mailRemainingDailyQuota = MailApp.getRemainingDailyQuota();
+
+  return {
+    ok: true,
+    message: 'Permisos concedits correctament.',
+    activeUserEmail,
+    dbSheetName: dbSheet.getName(),
+    leaveAbsenceSheetName: leaveAbsenceSheet.getName(),
+    workloadProfessorsSheetName: workloadProfessorsSheet.getName(),
+    workloadCarrecsSheetName: workloadCarrecsSheet.getName(),
+    mailRemainingDailyQuota,
+  };
+}
+
 function assertUserAccess_() {
   const access = getAccessDecision_();
   if (!access.allowed) {
