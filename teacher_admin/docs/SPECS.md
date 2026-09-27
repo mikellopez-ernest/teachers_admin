@@ -302,6 +302,7 @@ Salut,
 - If rows are selected, clicking it opens a small modal window with export options.
 - Export option `Full de càlcul` downloads a spreadsheet-compatible CSV file containing selected rows.
 - Export option `Llistat signatures` downloads a PDF containing selected rows.
+- Export option `Control horari` downloads an attendance PDF containing selected rows.
 - Export option `Etiquetes` downloads a PDF sticker sheet containing selected rows.
 - CSV exported data includes DB columns A through P and the header row.
 - The app does not create any export file in Google Drive.
@@ -316,6 +317,21 @@ Salut,
   - column 3: `Observacions`.
 - Column 1 is sized from the widest selected teacher name, with a cap so column 3 has more usable width.
 - Rows are tall enough to fit 17 teachers per page.
+- Cell text is vertically centered and horizontally left-aligned.
+- The PDF is generated in the browser and downloaded to the user's computer.
+
+#### `Control horari` PDF
+
+- The PDF contains only selected teachers.
+- Teacher names use the same alphabetical first-surname ordering as `Llistat signatures`.
+- Rows have the same height as `Llistat signatures`, fitting 17 teachers per page.
+- The table contains five columns:
+  - `Professor/a`, with the same dynamic width as `Llistat signatures`;
+  - `Hora entrada`, blank;
+  - `Signatura`, blank;
+  - `Hora sortida`, blank;
+  - `Signatura`, blank.
+- The four blank attendance columns divide the remaining table width evenly.
 - Cell text is vertically centered and horizontally left-aligned.
 - The PDF is generated in the browser and downloaded to the user's computer.
 
@@ -350,6 +366,7 @@ Expected server-side functions:
 Expected client-side export functions:
 
 - `downloadSignatureListPdf()`: generates the selected-teacher signature PDF in the browser.
+- `downloadAttendanceListPdf()`: generates the selected-teacher attendance PDF in the browser.
 - `downloadLabelsPdf()`: generates the selected-teacher label PDF in the browser.
 
 ## Decisions
@@ -364,7 +381,7 @@ Expected client-side export functions:
 - `RESET` clears only the department and name filters.
 - Action buttons warn when no row is selected.
 - Phase two edit scope is DB columns A through P, except `BAIXA?` which is read-only in the edit form.
-- Export formats are selected from the `Exportar` modal: `Full de càlcul` CSV, `Llistat signatures` PDF, and `Etiquetes` PDF.
+- Export formats are selected from the `Exportar` modal: `Full de càlcul` CSV, `Llistat signatures` PDF, `Control horari` PDF, and `Etiquetes` PDF.
 
 ## Repository Security
 

@@ -437,6 +437,10 @@
             Llistat signatures
           </label>
           <label class="export-option">
+            <input type="radio" name="exportFormat" value="attendancePdf">
+            Control horari
+          </label>
+          <label class="export-option">
             <input type="radio" name="exportFormat" value="labelsPdf">
             Etiquetes
           </label>
@@ -1219,6 +1223,12 @@
           return;
         }
 
+        if (selectedFormat === 'attendancePdf') {
+          downloadAttendanceListPdf();
+          elements.confirmExportButton.disabled = false;
+          return;
+        }
+
         if (selectedFormat === 'labelsPdf') {
           downloadLabelsPdf();
           elements.confirmExportButton.disabled = false;
@@ -1322,6 +1332,103 @@
             0: { cellWidth: nameWidth },
             1: { cellWidth: signatureWidth },
             2: { cellWidth: observationsWidth },
+          },
+          rowPageBreak: 'avoid',
+          didDrawPage: () => {
+            const pageInfo = doc.internal.getCurrentPageInfo();
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.text('Pàgina ' + pageInfo.pageNumber, 198, 288, { align: 'right' });
+          },
+        });
+
+        doc.save(fileName);
+        elements.exportResult.textContent = 'Descarregat: ' + fileName;
+      }
+
+      function downloadAttendanceListPdf() {
+        const selectedRows = getSelectedRowObjects();
+        if (!selectedRows.length) {
+          elements.exportResult.textContent = 'Cal seleccionar almenys una fila.';
+          elements.exportResult.classList.add('error');
+          return;
+        }
+
+        const PdfConstructor = window.jspdf && window.jspdf.jsPDF;
+        if (!PdfConstructor || typeof PdfConstructor !== 'function') {
+          elements.exportResult.textContent = "No s'ha pogut carregar el generador de PDF.";
+          elements.exportResult.classList.add('error');
+          return;
+        }
+
+        const rows = selectedRows
+          .filter((row) => row.fullName)
+          .sort((a, b) => compareRows(a, b, 'fullName'))
+          .map((row) => [row.fullName, '', '', '', '']);
+
+        if (!rows.length) {
+          elements.exportResult.textContent = 'No hi ha noms per generar el llistat.';
+          elements.exportResult.classList.add('error');
+          return;
+        }
+
+        const doc = new PdfConstructor({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4',
+        });
+        if (typeof doc.autoTable !== 'function') {
+          elements.exportResult.textContent = "No s'ha pogut carregar el generador de taules PDF.";
+          elements.exportResult.classList.add('error');
+          return;
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+        const fileName = 'control-horari-professorat-' + today + '.pdf';
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const availableWidth = pageWidth - 24;
+
+        doc.setProperties({ title: 'Control horari professorat' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        const widestName = rows.reduce((widest, row) => Math.max(widest, doc.getTextWidth(row[0])), 0);
+        const nameWidth = Math.min(Math.max(widestName + 6, 54), 92);
+        const remainingColumnWidth = (availableWidth - nameWidth) / 4;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('Control horari professorat', 12, 13);
+
+        doc.autoTable({
+          head: [['Professor/a', 'Hora entrada', 'Signatura', 'Hora sortida', 'Signatura']],
+          body: rows,
+          startY: 18,
+          margin: { top: 12, right: 12, bottom: 12, left: 12 },
+          theme: 'grid',
+          styles: {
+            font: 'helvetica',
+            fontSize: 9,
+            textColor: [0, 0, 0],
+            lineColor: [0, 0, 0],
+            lineWidth: 0.15,
+            cellPadding: { top: 2, right: 2, bottom: 2, left: 2 },
+            minCellHeight: 15.2,
+            halign: 'left',
+            valign: 'middle',
+            overflow: 'linebreak',
+          },
+          headStyles: {
+            fillColor: [255, 255, 255],
+            textColor: [0, 0, 0],
+            fontStyle: 'bold',
+            minCellHeight: 8,
+          },
+          columnStyles: {
+            0: { cellWidth: nameWidth },
+            1: { cellWidth: remainingColumnWidth },
+            2: { cellWidth: remainingColumnWidth },
+            3: { cellWidth: remainingColumnWidth },
+            4: { cellWidth: remainingColumnWidth },
           },
           rowPageBreak: 'avoid',
           didDrawPage: () => {

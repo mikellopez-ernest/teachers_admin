@@ -77,8 +77,9 @@ The DB spreadsheet also has a `leave_absence` sheet with `row_id`, `teacher_code
 - Starting a leave sends an email to `claustre@iernestlluch.cat` with subject `Nova incorporació`, announcing the substitute and the original teacher.
 - Starting or ending a leave calls the Horaris schedule cache rebuild endpoint with JSON POST `action=rebuildScheduleCache`.
 - `Desactivar` / `Activar` updates column N.
-- `Exportar` opens export options for selected rows: spreadsheet-compatible CSV, a browser-generated PDF signature list, or PDF teacher stickers.
+- `Exportar` opens export options for selected rows: spreadsheet-compatible CSV, a browser-generated PDF signature list, a PDF attendance list, or PDF teacher stickers.
 - The signature list includes only selected teachers, sorted by first surname, with columns for teacher name, signature, and observations.
+- `Control horari` includes only selected teachers in the same order and row height as the signature list, with columns for teacher, entry time, signature, exit time, and signature.
 - `Etiquetes` creates a selected-teacher PDF with two columns and fifteen rows per page, with each teacher name centered in its cell as uppercase `COGNOM1 COGNOM2, NOM`.
 - Rows with `SUBST?` checked are shown in slight green; leave-of-absence rows are shown in slight red.
 - Action buttons warn if no row is selected.
