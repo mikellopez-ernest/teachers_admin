@@ -302,7 +302,7 @@ Salut,
 - If rows are selected, clicking it opens a small modal window with export options.
 - Export option `Full de càlcul` downloads a spreadsheet-compatible CSV file containing selected rows.
 - Export option `Llistat signatures` downloads a PDF containing selected rows.
-- Export option `Control horari` downloads an attendance PDF containing selected rows.
+- Export option `Full signatures vagues` downloads an attendance PDF containing selected rows.
 - Export option `Etiquetes` downloads a PDF sticker sheet containing selected rows.
 - CSV exported data includes DB columns A through P and the header row.
 - The app does not create any export file in Google Drive.
@@ -320,7 +320,7 @@ Salut,
 - Cell text is vertically centered and horizontally left-aligned.
 - The PDF is generated in the browser and downloaded to the user's computer.
 
-#### `Control horari` PDF
+#### `Full signatures vagues` PDF
 
 - The PDF contains only selected teachers.
 - Teacher names use the same alphabetical first-surname ordering as `Llistat signatures`.
@@ -366,7 +366,7 @@ Expected server-side functions:
 Expected client-side export functions:
 
 - `downloadSignatureListPdf()`: generates the selected-teacher signature PDF in the browser.
-- `downloadAttendanceListPdf()`: generates the selected-teacher attendance PDF in the browser.
+- `downloadStrikeSignaturesPdf()`: generates the selected-teacher attendance PDF in the browser.
 - `downloadLabelsPdf()`: generates the selected-teacher label PDF in the browser.
 
 ## Decisions
@@ -381,7 +381,7 @@ Expected client-side export functions:
 - `RESET` clears only the department and name filters.
 - Action buttons warn when no row is selected.
 - Phase two edit scope is DB columns A through P, except `BAIXA?` which is read-only in the edit form.
-- Export formats are selected from the `Exportar` modal: `Full de càlcul` CSV, `Llistat signatures` PDF, `Control horari` PDF, and `Etiquetes` PDF.
+- Export formats are selected from the `Exportar` modal: `Full de càlcul` CSV, `Llistat signatures` PDF, `Full signatures vagues` PDF, and `Etiquetes` PDF.
 
 ## Repository Security
 

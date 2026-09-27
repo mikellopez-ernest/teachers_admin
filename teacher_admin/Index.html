@@ -437,8 +437,8 @@
             Llistat signatures
           </label>
           <label class="export-option">
-            <input type="radio" name="exportFormat" value="attendancePdf">
-            Control horari
+            <input type="radio" name="exportFormat" value="strikeSignaturesPdf">
+            Full signatures vagues
           </label>
           <label class="export-option">
             <input type="radio" name="exportFormat" value="labelsPdf">
@@ -1223,8 +1223,8 @@
           return;
         }
 
-        if (selectedFormat === 'attendancePdf') {
-          downloadAttendanceListPdf();
+        if (selectedFormat === 'strikeSignaturesPdf') {
+          downloadStrikeSignaturesPdf();
           elements.confirmExportButton.disabled = false;
           return;
         }
@@ -1346,7 +1346,7 @@
         elements.exportResult.textContent = 'Descarregat: ' + fileName;
       }
 
-      function downloadAttendanceListPdf() {
+      function downloadStrikeSignaturesPdf() {
         const selectedRows = getSelectedRowObjects();
         if (!selectedRows.length) {
           elements.exportResult.textContent = 'Cal seleccionar almenys una fila.';
@@ -1384,11 +1384,11 @@
         }
 
         const today = new Date().toISOString().slice(0, 10);
-        const fileName = 'control-horari-professorat-' + today + '.pdf';
+        const fileName = 'full-signatures-vagues-' + today + '.pdf';
         const pageWidth = doc.internal.pageSize.getWidth();
         const availableWidth = pageWidth - 24;
 
-        doc.setProperties({ title: 'Control horari professorat' });
+        doc.setProperties({ title: 'Full signatures vagues' });
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         const widestName = rows.reduce((widest, row) => Math.max(widest, doc.getTextWidth(row[0])), 0);
@@ -1397,7 +1397,7 @@
 
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(14);
-        doc.text('Control horari professorat', 12, 13);
+        doc.text('Full signatures vagues', 12, 13);
 
         doc.autoTable({
           head: [['Professor/a', 'Hora entrada', 'Signatura', 'Hora sortida', 'Signatura']],
