@@ -102,6 +102,8 @@ Detailed behavior is specified in [`docs/SPECS.md`](docs/SPECS.md).
 - `cache_rebuild_token`: required token sent in the JSON POST payload to the Horaris cache rebuild endpoint after starting or ending a leave.
 - `cache_rebuild_url`: optional override for the Horaris cache rebuild endpoint. If omitted, the app uses `https://script.google.com/macros/s/AKfycbyhSqCTkS27bDxsfILI64rlSMUTN5A7VbHGgpSf_G6efxrWfOuUKJULnN2rlMtHuWqwmA/exec`.
 
+If the optional `cache_rebuild_url` override returns HTTP 404, the app retries once with the built-in endpoint and records the fallback in `cache_rebuild_log`.
+
 ## Cache Rebuild Endpoint
 
 The Horaris rebuild endpoint must be deployed so this app can reach it with `UrlFetchApp`.

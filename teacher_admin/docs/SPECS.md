@@ -242,6 +242,7 @@ Salut,
 - The leave workflow must notify the Horaris cache rebuild web app after starting or ending a leave.
 - The default endpoint URL is `https://script.google.com/macros/s/AKfycbyhSqCTkS27bDxsfILI64rlSMUTN5A7VbHGgpSf_G6efxrWfOuUKJULnN2rlMtHuWqwmA/exec`.
 - The endpoint URL can be overridden with script property `cache_rebuild_url`.
+- If the configured `cache_rebuild_url` override returns HTTP 404, retry once with the default endpoint and log both the failed response and the fallback attempt in `cache_rebuild_log`.
 - The authorization token is read from script property `cache_rebuild_token`.
 - If `cache_rebuild_token` is not set in this project, the leave workflow reports an error.
 - The Apps Script manifest must include `https://www.googleapis.com/auth/script.external_request` so `UrlFetchApp` can call the Horaris endpoint.

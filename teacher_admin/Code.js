@@ -836,10 +836,11 @@ function sendLeaveAbsenceNotificationEmail_(originalTeacherName, substituteTeach
   });
 }
 
-function notifyScheduleCacheRebuild_(context) {
+function notifyScheduleCacheRebuild_(context, endpointOverride) {
   const properties = PropertiesService.getScriptProperties();
   const endpointUrl = toDisplayString_(
-    properties.getProperty(CONFIG.cacheRebuildUrlPropertyName)
+    endpointOverride
+      || properties.getProperty(CONFIG.cacheRebuildUrlPropertyName)
       || CONFIG.defaultCacheRebuildUrl
   );
   const token = toDisplayString_(
@@ -935,6 +936,30 @@ function notifyScheduleCacheRebuild_(context) {
     statusCode,
     responseText,
   });
+
+  if (
+    statusCode === 404
+    && !endpointOverride
+    && endpointUrl !== CONFIG.defaultCacheRebuildUrl
+  ) {
+    const fallbackMessage = 'configured endpoint returned 404; retrying default endpoint';
+    console.warn(JSON.stringify({
+      event: 'scheduleCacheRebuild.notify.fallback',
+      context: logContext,
+      endpointUrl: requestLogUrl,
+      fallbackEndpointUrl: CONFIG.defaultCacheRebuildUrl,
+      statusCode,
+    }));
+    appendScheduleCacheRebuildLog_('scheduleCacheRebuild.notify.fallback', {
+      context: logContext,
+      endpointUrl: requestLogUrl,
+      hasToken: true,
+      statusCode,
+      responseText,
+      error: fallbackMessage,
+    });
+    return notifyScheduleCacheRebuild_(logContext, CONFIG.defaultCacheRebuildUrl);
+  }
 
   let result;
 
