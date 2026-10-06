@@ -709,16 +709,16 @@ function createAnnualTeacherDataDocx(rowNumbers) {
 
   try {
     const templateDocx = exportGoogleDocAsDocx_(temporaryFile.getId());
+    const outputFileName = `dades-anuals-professorat-${timestamp}.docx`;
     const mergedDocx = buildAnnualTeacherDataDocx_(
       templateDocx,
       teachers.map((teacher) => {
         return buildAnnualTeacherTagValues_(teacher, teacherCarrecs, today);
-      }),
-      `dades-anuals-professorat-${timestamp}.docx`
+      })
     );
 
     return {
-      fileName: mergedDocx.getName(),
+      fileName: outputFileName,
       mimeType: DOCX_MIME_TYPE,
       base64: Utilities.base64Encode(mergedDocx.getBytes()),
       rowCount: teachers.length,
@@ -804,15 +804,20 @@ function exportGoogleDocAsDocx_(fileId) {
     );
   }
 
-  return response.getBlob().setName('dades-anuals-template.docx');
+  return response.getBlob();
 }
 
-function buildAnnualTeacherDataDocx_(templateDocx, teacherTagValues, fileName) {
+function buildAnnualTeacherDataDocx_(templateDocx, teacherTagValues) {
   if (!teacherTagValues.length) {
     throw new Error('Cal seleccionar almenys una fila.');
   }
 
-  const entries = Utilities.unzip(templateDocx);
+  const templateZip = Utilities.newBlob(
+    templateDocx.getBytes(),
+    'application/zip',
+    'dades-anuals-template.zip'
+  );
+  const entries = Utilities.unzip(templateZip);
   const documentEntry = entries.find((entry) => entry.getName() === 'word/document.xml');
   if (!documentEntry) {
     throw new Error('La plantilla DOCX no conte word/document.xml.');
@@ -858,7 +863,7 @@ function buildAnnualTeacherDataDocx_(templateDocx, teacherTagValues, fileName) {
   });
   outputEntries.push(createBlankFirstPageFooterBlob_());
 
-  return Utilities.zip(outputEntries, fileName);
+  return Utilities.zip(outputEntries);
 }
 
 function replaceAnnualTeacherTagsInXml_(xml, tagValues) {
