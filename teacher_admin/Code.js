@@ -858,7 +858,7 @@ function buildAnnualTeacherDataDocx_(templateDocx, teacherTagValues, fileName) {
   });
   outputEntries.push(createBlankFirstPageFooterBlob_());
 
-  return Utilities.zip(outputEntries, fileName).setContentType(DOCX_MIME_TYPE);
+  return Utilities.zip(outputEntries, fileName);
 }
 
 function replaceAnnualTeacherTagsInXml_(xml, tagValues) {
