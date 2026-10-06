@@ -444,6 +444,10 @@
             <input type="radio" name="exportFormat" value="labelsPdf">
             Etiquetes
           </label>
+          <label class="export-option">
+            <input type="radio" name="exportFormat" value="annualDataDocx">
+            Dades anuals
+          </label>
           <div id="exportResult" class="message"></div>
         </div>
         <footer class="app-modal-actions">
@@ -1235,6 +1239,23 @@
           return;
         }
 
+        if (selectedFormat === 'annualDataDocx') {
+          google.script.run
+            .withSuccessHandler((result) => {
+              elements.confirmExportButton.disabled = false;
+              elements.exportResult.innerHTML = '';
+              downloadBase64File(result);
+              elements.exportResult.textContent = `Descarregat: ${result.fileName}`;
+            })
+            .withFailureHandler((error) => {
+              elements.confirmExportButton.disabled = false;
+              elements.exportResult.textContent = getErrorMessage(error);
+              elements.exportResult.classList.add('error');
+            })
+            .createAnnualTeacherDataDocx(rowNumbers);
+          return;
+        }
+
         google.script.run
           .withSuccessHandler((result) => {
             elements.confirmExportButton.disabled = false;
@@ -1528,6 +1549,26 @@
       function downloadTextFile(file) {
         const blob = new Blob([file.content], {
           type: file.mimeType || 'text/csv;charset=utf-8',
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = file.fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function downloadBase64File(file) {
+        const binary = atob(file.base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) {
+          bytes[index] = binary.charCodeAt(index);
+        }
+
+        const blob = new Blob([bytes], {
+          type: file.mimeType || 'application/octet-stream',
         });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');

@@ -18,6 +18,7 @@ const CONFIG = {
   leaveNotificationSubject: 'Nova incorporació',
   cacheRebuildUrlPropertyName: 'cache_rebuild_url',
   cacheRebuildTokenPropertyName: 'cache_rebuild_token',
+  officialScheduleTeachersDocIdPropertyName: 'official_schedule_teachers_doc_id',
   defaultCacheRebuildUrl: 'https://script.google.com/macros/s/AKfycbyhSqCTkS27bDxsfILI64rlSMUTN5A7VbHGgpSf_G6efxrWfOuUKJULnN2rlMtHuWqwmA/exec',
   leaveAbsenceHeaders: ['row_id', 'teacher_code', 'substitute_code', 'start_date', 'end_date', 'comments'],
   cacheRebuildLogSheetName: 'cache_rebuild_log',
@@ -47,7 +48,28 @@ const WORKLOAD_PROFESSORS_COLUMNS = {
 const CARRECS_COLUMNS = {
   carrec: 1,
   asignado: 4,
+  isCarrec: 6,
 };
+
+const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const DOCX_BLANK_FIRST_FOOTER_PATH = 'word/footer-teacher-admin-blank.xml';
+const DOCX_BLANK_FIRST_FOOTER_REL_ID = 'rIdTeacherAdminBlankFirstFooter';
+
+const ANNUAL_DATA_PENDING_TAGS = [
+  'HORARI',
+  'HORES_ESO',
+  'HORES_PFI',
+  'HORES_BAT',
+  'HORES_CICLES',
+  'HORES_FCT',
+  'TUT_ESO',
+  'TUT_BAT',
+  'TUT_FP',
+  'CARREC_DIRECTIU',
+  'CARREC',
+  'REUNIONS',
+  'GUARDIES',
+];
 
 const DB_COLUMNS = [
   { index: 1, key: 'esp', label: 'ESP', type: 'text' },
@@ -95,6 +117,9 @@ function grantRequiredPermissions() {
   properties.getProperty(CONFIG.accessGrantedPropertyName);
   properties.getProperty(CONFIG.cacheRebuildUrlPropertyName);
   properties.getProperty(CONFIG.cacheRebuildTokenPropertyName);
+  const officialScheduleTemplateId = toDisplayString_(
+    properties.getProperty(CONFIG.officialScheduleTeachersDocIdPropertyName)
+  );
 
   const activeUserEmail = Session.getActiveUser().getEmail();
   const dbSheet = getDbSheet_();
@@ -114,6 +139,9 @@ function grantRequiredPermissions() {
   });
 
   const mailRemainingDailyQuota = MailApp.getRemainingDailyQuota();
+  const officialScheduleTemplateName = officialScheduleTemplateId
+    ? DriveApp.getFileById(officialScheduleTemplateId).getName()
+    : '';
 
   return {
     ok: true,
@@ -123,6 +151,7 @@ function grantRequiredPermissions() {
     leaveAbsenceSheetName: leaveAbsenceSheet.getName(),
     workloadProfessorsSheetName: workloadProfessorsSheet.getName(),
     workloadCarrecsSheetName: workloadCarrecsSheet.getName(),
+    officialScheduleTemplateName,
     mailRemainingDailyQuota,
   };
 }
@@ -593,6 +622,283 @@ function exportTeachers(rowNumbers) {
     content: toCsv_([header, ...rows]),
     rowCount: rows.length,
   };
+}
+
+function createAnnualTeacherDataDocx(rowNumbers) {
+  assertUserAccess_();
+  const uniqueRows = normalizeRowNumbers_(rowNumbers);
+  const properties = PropertiesService.getScriptProperties();
+  const templateId = toDisplayString_(
+    properties.getProperty(CONFIG.officialScheduleTeachersDocIdPropertyName)
+  );
+
+  if (!templateId) {
+    throw new Error(
+      `Falta la propietat de script "${CONFIG.officialScheduleTeachersDocIdPropertyName}".`
+    );
+  }
+
+  const templateFile = DriveApp.getFileById(templateId);
+  if (templateFile.getMimeType() !== MimeType.GOOGLE_DOCS) {
+    throw new Error('El document configurat per a Dades anuals no es un document de Google.');
+  }
+
+  const dbSheet = getDbSheet_();
+  const teachers = uniqueRows.map((rowNumber) => {
+    return dbSheet
+      .getRange(rowNumber, 1, 1, CONFIG.editableColumnCount)
+      .getDisplayValues()[0];
+  });
+  const teacherCarrecs = getTeacherCarrecs_();
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
+  const timestamp = Utilities.formatDate(
+    new Date(),
+    Session.getScriptTimeZone(),
+    'yyyyMMdd-HHmmss'
+  );
+  const temporaryFile = templateFile.makeCopy(`teacher-admin-dades-anuals-${timestamp}`);
+
+  try {
+    const templateDocx = exportGoogleDocAsDocx_(temporaryFile.getId());
+    const mergedDocx = buildAnnualTeacherDataDocx_(
+      templateDocx,
+      teachers.map((teacher) => {
+        return buildAnnualTeacherTagValues_(teacher, teacherCarrecs, today);
+      }),
+      `dades-anuals-professorat-${timestamp}.docx`
+    );
+
+    return {
+      fileName: mergedDocx.getName(),
+      mimeType: DOCX_MIME_TYPE,
+      base64: Utilities.base64Encode(mergedDocx.getBytes()),
+      rowCount: teachers.length,
+    };
+  } finally {
+    try {
+      temporaryFile.setTrashed(true);
+    } catch (error) {
+      console.error(JSON.stringify({
+        event: 'annualTeacherData.tempFile.trashError',
+        fileId: temporaryFile.getId(),
+        error: error && error.message ? error.message : String(error),
+      }));
+    }
+  }
+}
+
+function getTeacherCarrecs_() {
+  const sheet = getWorkloadCarrecsSheet_();
+  const lastRow = sheet.getLastRow();
+  const teacherCarrecs = new Map();
+
+  if (lastRow < 2) return teacherCarrecs;
+
+  const values = sheet
+    .getRange(2, 1, lastRow - 1, CARRECS_COLUMNS.isCarrec)
+    .getDisplayValues();
+
+  values.forEach((row) => {
+    if (!isTruthyValue_(row[CARRECS_COLUMNS.isCarrec - 1])) return;
+
+    const carrec = toDisplayString_(row[CARRECS_COLUMNS.carrec - 1]);
+    if (!carrec) return;
+
+    splitCommaList_(row[CARRECS_COLUMNS.asignado - 1]).forEach((teacherName) => {
+      const teacherKey = normalizeText_(teacherName);
+      if (teacherKey && !teacherCarrecs.has(teacherKey)) {
+        teacherCarrecs.set(teacherKey, carrec);
+      }
+    });
+  });
+
+  return teacherCarrecs;
+}
+
+function buildAnnualTeacherTagValues_(teacher, teacherCarrecs, today) {
+  const fullName = buildFullName_(teacher);
+  const situacio = toDisplayString_(teacher[6]);
+  const values = {
+    cognom1: toDisplayString_(teacher[3]),
+    cognom2: toDisplayString_(teacher[4]),
+    nom: toDisplayString_(teacher[2]),
+    DNI: toDisplayString_(teacher[8]),
+    Carrec: teacherCarrecs.get(normalizeText_(fullName)) || '',
+    Especialitat: toDisplayString_(teacher[0]),
+    'FUNC.DEF': situacio === 'FUNC. DEF' ? 'x' : '',
+    CS: situacio === 'CS' ? 'x' : '',
+    'FUNC. SNS PLAÇA': situacio === 'FUNC. SNS PLAÇA' ? 'x' : '',
+    INT: situacio === 'INT' ? 'x' : '',
+    DATA: today,
+  };
+
+  ANNUAL_DATA_PENDING_TAGS.forEach((tagName) => {
+    values[tagName] = '';
+  });
+
+  return values;
+}
+
+function exportGoogleDocAsDocx_(fileId) {
+  const exportUrl = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export`
+    + `?mimeType=${encodeURIComponent(DOCX_MIME_TYPE)}`;
+  const response = UrlFetchApp.fetch(exportUrl, {
+    headers: {
+      Authorization: `Bearer ${ScriptApp.getOAuthToken()}`,
+    },
+    muteHttpExceptions: true,
+  });
+
+  if (response.getResponseCode() !== 200) {
+    throw new Error(
+      `No s'ha pogut exportar la plantilla Dades anuals (${response.getResponseCode()}).`
+    );
+  }
+
+  return response.getBlob().setName('dades-anuals-template.docx');
+}
+
+function buildAnnualTeacherDataDocx_(templateDocx, teacherTagValues, fileName) {
+  if (!teacherTagValues.length) {
+    throw new Error('Cal seleccionar almenys una fila.');
+  }
+
+  const entries = Utilities.unzip(templateDocx);
+  const documentEntry = entries.find((entry) => entry.getName() === 'word/document.xml');
+  if (!documentEntry) {
+    throw new Error('La plantilla DOCX no conte word/document.xml.');
+  }
+
+  const documentXml = documentEntry.getDataAsString('UTF-8');
+  const bodyMatch = documentXml.match(/<w:body\b[^>]*>([\s\S]*?)<\/w:body>/);
+  if (!bodyMatch) {
+    throw new Error('No s\'ha pogut identificar el cos de la plantilla DOCX.');
+  }
+
+  const templateBody = bodyMatch[1];
+  const teacherBodies = teacherTagValues.map((tagValues, index) => {
+    let body = replaceAnnualTeacherTagsInXml_(templateBody, tagValues);
+    body = removeDocxBookmarks_(body);
+    body = forceDocxSectionsToNextPage_(body);
+    body = addBlankFirstPageFooterReference_(body);
+    if (index < teacherTagValues.length - 1) {
+      body = convertFinalSectionToBreak_(body);
+    }
+    return body;
+  });
+  const mergedDocumentXml = documentXml.replace(bodyMatch[1], teacherBodies.join(''));
+  const outputEntries = entries.map((entry) => {
+    if (entry.getName() === 'word/document.xml') {
+      return Utilities.newBlob(mergedDocumentXml, 'application/xml', 'word/document.xml');
+    }
+    if (entry.getName() === 'word/_rels/document.xml.rels') {
+      return Utilities.newBlob(
+        addBlankFooterRelationship_(entry.getDataAsString('UTF-8')),
+        'application/xml',
+        'word/_rels/document.xml.rels'
+      );
+    }
+    if (entry.getName() === '[Content_Types].xml') {
+      return Utilities.newBlob(
+        addBlankFooterContentType_(entry.getDataAsString('UTF-8')),
+        'application/xml',
+        '[Content_Types].xml'
+      );
+    }
+    return entry;
+  });
+  outputEntries.push(createBlankFirstPageFooterBlob_());
+
+  return Utilities.zip(outputEntries, fileName).setContentType(DOCX_MIME_TYPE);
+}
+
+function replaceAnnualTeacherTagsInXml_(xml, tagValues) {
+  let result = xml;
+  Object.keys(tagValues).forEach((tagName) => {
+    const encodedTag = escapeXmlText_(`<<${tagName}>>`);
+    if (!result.includes(encodedTag)) {
+      throw new Error(`No s'ha trobat l'etiqueta <<${tagName}>> a la plantilla Dades anuals.`);
+    }
+    const encodedValue = escapeXmlText_(tagValues[tagName]);
+    result = result.split(encodedTag).join(encodedValue);
+  });
+  return result;
+}
+
+function removeDocxBookmarks_(xml) {
+  return xml
+    .replace(/<w:bookmarkStart\b[^>]*\/>/g, '')
+    .replace(/<w:bookmarkEnd\b[^>]*\/>/g, '');
+}
+
+function forceDocxSectionsToNextPage_(xml) {
+  return xml.replace(/<w:sectPr\b[^>]*>[\s\S]*?<\/w:sectPr>/g, (sectionXml) => {
+    const withoutType = sectionXml.replace(/<w:type\b[^>]*\/>/g, '');
+    return withoutType.replace(
+      /^(<w:sectPr\b[^>]*>)/,
+      '$1<w:type w:val="nextPage"/>'
+    );
+  });
+}
+
+function addBlankFirstPageFooterReference_(xml) {
+  return xml.replace(/<w:sectPr\b[^>]*>[\s\S]*?<\/w:sectPr>/g, (sectionXml) => {
+    if (
+      !/<w:titlePg\b/.test(sectionXml)
+      || /<w:footerReference\b[^>]*w:type="first"/.test(sectionXml)
+    ) {
+      return sectionXml;
+    }
+    return sectionXml.replace(
+      /^(<w:sectPr\b[^>]*>)/,
+      `$1<w:footerReference w:type="first" r:id="${DOCX_BLANK_FIRST_FOOTER_REL_ID}"/>`
+    );
+  });
+}
+
+function addBlankFooterRelationship_(relationshipsXml) {
+  if (relationshipsXml.includes(`Id="${DOCX_BLANK_FIRST_FOOTER_REL_ID}"`)) {
+    return relationshipsXml;
+  }
+  const relationship = '<Relationship'
+    + ` Id="${DOCX_BLANK_FIRST_FOOTER_REL_ID}"`
+    + ' Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer"'
+    + ' Target="footer-teacher-admin-blank.xml"/>';
+  return relationshipsXml.replace('</Relationships>', `${relationship}</Relationships>`);
+}
+
+function addBlankFooterContentType_(contentTypesXml) {
+  const partName = '/word/footer-teacher-admin-blank.xml';
+  if (contentTypesXml.includes(`PartName="${partName}"`)) {
+    return contentTypesXml;
+  }
+  const override = `<Override PartName="${partName}"`
+    + ' ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>';
+  return contentTypesXml.replace('</Types>', `${override}</Types>`);
+}
+
+function createBlankFirstPageFooterBlob_() {
+  const xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    + '<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+    + '<w:p/>'
+    + '</w:ftr>';
+  return Utilities.newBlob(xml, 'application/xml', DOCX_BLANK_FIRST_FOOTER_PATH);
+}
+
+function convertFinalSectionToBreak_(bodyXml) {
+  const match = bodyXml.match(/^([\s\S]*)(<w:sectPr\b[\s\S]*?<\/w:sectPr>)(\s*)$/);
+  if (!match) {
+    throw new Error('No s\'ha pogut conservar el salt de seccio de la plantilla DOCX.');
+  }
+
+  return `${match[1]}<w:p><w:pPr>${match[2]}</w:pPr></w:p>${match[3]}`;
+}
+
+function escapeXmlText_(value) {
+  return toDisplayString_(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 function getDbSheet_() {

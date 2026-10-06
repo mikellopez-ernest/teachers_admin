@@ -305,8 +305,10 @@ Salut,
 - Export option `Llistat signatures` downloads a PDF containing selected rows.
 - Export option `Full signatures vagues` downloads an attendance PDF containing selected rows.
 - Export option `Etiquetes` downloads a PDF sticker sheet containing selected rows.
+- Export option `Dades anuals` downloads one combined DOCX containing a complete two-page official form for every selected teacher.
 - CSV exported data includes DB columns A through P and the header row.
-- The app does not create any export file in Google Drive.
+- Browser-generated PDF and CSV exports do not create files in Google Drive.
+- `Dades anuals` creates one temporary Google Docs copy of its configured template and always moves that copy to Drive trash after export, including when generation fails.
 
 #### `Llistat signatures` PDF
 
@@ -348,6 +350,32 @@ Salut,
 - Blank cells are allowed on the final page when the selected-teacher count is odd.
 - The PDF is generated in the browser and downloaded to the user's computer.
 
+#### `Dades anuals` DOCX
+
+- Required script property: `official_schedule_teachers_doc_id`, containing the Google document ID of the official two-page template.
+- The export contains only selected teachers, in DB row order.
+- Every teacher receives a complete copy of the two-page template and starts on a new page.
+- All teacher copies are concatenated into one DOCX and downloaded to the user's computer.
+- The app makes one temporary Google Docs copy of the template, exports it as DOCX, builds the repeated teacher sections in memory, and trashes the temporary Google document in a `finally` block.
+- The OOXML merge preserves both template sections, forces each section onto its own page after deferred tags are blanked, and repeats the first-page and second-page headers for every teacher.
+- Teacher data comes from `Dades de professors -> Llista`:
+  - `<<cognom1>>`: column D `COGNOM1`;
+  - `<<cognom2>>`: column E `COGNOM2`;
+  - `<<nom>>`: column C `NOM`;
+  - `<<DNI>>`: column I `DNI`;
+  - `<<Especialitat>>`: column A `ESP`.
+- `<<Carrec>>` comes from the first row in `Càrrega lectiva -> carrecs` where column F `is_carrec` is true and column D `asignado?` contains the teacher's exact full name `NOM COGNOM1 COGNOM2`. Multiple assigned names in a cell are comma-separated. If no match exists, the value is blank.
+- Administrative status tags use `Dades de professors -> Llista` column G `SITUACIÓ`:
+  - `<<FUNC.DEF>>`: `x` only for `FUNC. DEF`;
+  - `<<CS>>`: `x` only for `CS`;
+  - `<<FUNC. SNS PLAÇA>>`: `x` only for `FUNC. SNS PLAÇA`;
+  - `<<INT>>`: `x` only for `INT`;
+  - all other status-tag values are blank.
+- `<<DATA>>` is the generation date formatted as `dd/MM/yyyy` in the script timezone.
+- These deferred tags are replaced with blanks: `<<HORARI>>`, `<<HORES_ESO>>`, `<<HORES_PFI>>`, `<<HORES_BAT>>`, `<<HORES_CICLES>>`, `<<HORES_FCT>>`, `<<TUT_ESO>>`, `<<TUT_BAT>>`, `<<TUT_FP>>`, `<<CARREC_DIRECTIU>>`, `<<CARREC>>`, `<<REUNIONS>>`, and `<<GUARDIES>>`.
+- The manifest includes `https://www.googleapis.com/auth/drive` for reading, copying, exporting, and trashing the configured template.
+- After adding this feature, the owner must run `grantRequiredPermissions()` once and accept the updated Drive permission.
+
 ## Apps Script Functions
 
 Expected server-side functions:
@@ -363,6 +391,7 @@ Expected server-side functions:
 - `getTeacherDetails(rowNumber)`: reads all editable teacher fields from DB columns A through P.
 - `saveTeacherDetails(rowNumber, fields)`: writes edited teacher fields back to DB columns A through P.
 - `exportTeachers(rowNumbers)`: returns CSV data for selected teacher rows so the browser can download it.
+- `createAnnualTeacherDataDocx(rowNumbers)`: creates and returns the combined selected-teacher DOCX as base64, then trashes its temporary Google Docs copy.
 
 Expected client-side export functions:
 
@@ -382,7 +411,7 @@ Expected client-side export functions:
 - `RESET` clears only the department and name filters.
 - Action buttons warn when no row is selected.
 - Phase two edit scope is DB columns A through P, except `BAIXA?` which is read-only in the edit form.
-- Export formats are selected from the `Exportar` modal: `Full de càlcul` CSV, `Llistat signatures` PDF, `Full signatures vagues` PDF, and `Etiquetes` PDF.
+- Export formats are selected from the `Exportar` modal: `Full de càlcul` CSV, `Llistat signatures` PDF, `Full signatures vagues` PDF, `Etiquetes` PDF, and `Dades anuals` DOCX.
 
 ## Repository Security
 

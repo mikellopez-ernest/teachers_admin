@@ -77,10 +77,11 @@ The DB spreadsheet also has a `leave_absence` sheet with `row_id`, `teacher_code
 - Starting a leave sends an email to `claustre@iernestlluch.cat` with subject `Nova incorporació`, announcing the substitute and the original teacher.
 - Starting or ending a leave calls the Horaris schedule cache rebuild endpoint with JSON POST `action=rebuildScheduleCache`.
 - `Desactivar` / `Activar` updates column N.
-- `Exportar` opens export options for selected rows: spreadsheet-compatible CSV, a browser-generated PDF signature list, a PDF attendance list, or PDF teacher stickers.
+- `Exportar` opens export options for selected rows: spreadsheet-compatible CSV, browser-generated PDF lists, PDF teacher stickers, or the combined official `Dades anuals` DOCX.
 - The signature list includes only selected teachers, sorted by first surname, with columns for teacher name, signature, and observations.
 - `Full signatures vagues` includes only selected teachers in the same order and row height as the signature list, with columns for teacher, entry time, signature, exit time, and signature.
 - `Etiquetes` creates a selected-teacher PDF with two columns and fifteen rows per page, with each teacher name centered in its cell as uppercase `COGNOM1 COGNOM2, NOM`.
+- `Dades anuals` fills the official two-page Google Docs template for every selected teacher, concatenates all forms into one DOCX, downloads it locally, and trashes the temporary Drive copy.
 - Rows with `SUBST?` checked are shown in slight green; leave-of-absence rows are shown in slight red.
 - Action buttons warn if no row is selected.
 - `BAIXA?` is read-only in the teacher edit form and is only changed through the leave workflow.
@@ -89,7 +90,7 @@ The DB spreadsheet also has a `leave_absence` sheet with `row_id`, `teacher_code
 
 This project is connected to Apps Script with `clasp`.
 
-After installing the project or adding OAuth scopes, run `grantRequiredPermissions()` once from the Apps Script editor and accept the authorization prompt. The helper grants the services used by the app, including spreadsheet access, external HTTP requests, user identity, script properties, and email sending. Its mail check uses `MailApp.getRemainingDailyQuota()` and does not send a test message.
+After installing the project or adding OAuth scopes, run `grantRequiredPermissions()` once from the Apps Script editor and accept the authorization prompt. The helper grants the services used by the app, including spreadsheet access, Drive template access, external HTTP requests, user identity, script properties, and email sending. Its mail check uses `MailApp.getRemainingDailyQuota()` and does not send a test message.
 
 The PDF exports are generated in the browser with jsPDF and jsPDF AutoTable loaded from CDN by `Index.html`.
 
@@ -101,6 +102,7 @@ Detailed behavior is specified in [`docs/SPECS.md`](docs/SPECS.md).
 - `access_granted`: comma-separated list of allowed càrrecs and/or direct emails.
 - `cache_rebuild_token`: required token sent in the JSON POST payload to the Horaris cache rebuild endpoint after starting or ending a leave.
 - `cache_rebuild_url`: optional override for the Horaris cache rebuild endpoint. If omitted, the app uses `https://script.google.com/macros/s/AKfycbyhSqCTkS27bDxsfILI64rlSMUTN5A7VbHGgpSf_G6efxrWfOuUKJULnN2rlMtHuWqwmA/exec`.
+- `official_schedule_teachers_doc_id`: required Google document ID used as the template for the `Dades anuals` DOCX export.
 
 If the optional `cache_rebuild_url` override returns HTTP 404, the app retries once with the built-in endpoint and records the fallback in `cache_rebuild_log`.
 
