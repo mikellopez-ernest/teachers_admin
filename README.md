@@ -15,6 +15,10 @@ Current scripts:
 - `teacher_admin/`: teacher database administration endpoint.
 - `teacher_list/`: teacher-list endpoint.
 
+Shared integration notes:
+
+- `docs/teacher-schedule-integration.md`: read-only schedule-cache lookup and timetable-rendering contract used by the annual teacher DOCX export.
+
 ## Local Secrets
 
 Do not commit local Apps Script credentials or deployment configuration.

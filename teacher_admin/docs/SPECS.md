@@ -357,7 +357,7 @@ Salut,
 - Every teacher receives a complete copy of the two-page template and starts on a new page.
 - All teacher copies are concatenated into one DOCX and downloaded to the user's computer.
 - The app makes one temporary Google Docs copy of the template, exports it as DOCX, builds the repeated teacher sections in memory, and trashes the temporary Google document in a `finally` block.
-- The OOXML merge preserves both template sections, forces each section onto its own page after deferred tags are blanked, and repeats the first-page and second-page headers for every teacher.
+- The OOXML merge preserves both template sections, forces each section onto its own page after the dynamic content is inserted, and repeats the first-page and second-page headers for every teacher. A populated schedule can make the first section flow onto an additional page rather than clipping content.
 - Teacher data comes from `Dades de professors -> Llista`:
   - `<<cognom1>>`: column D `COGNOM1`;
   - `<<cognom2>>`: column E `COGNOM2`;
@@ -372,9 +372,33 @@ Salut,
   - `<<INT>>`: `x` only for `INT`;
   - all other status-tag values are blank.
 - `<<DATA>>` is the generation date formatted as `dd/MM/yyyy` in the script timezone.
-- These deferred tags are replaced with blanks: `<<HORARI>>`, `<<HORES_ESO>>`, `<<HORES_PFI>>`, `<<HORES_BAT>>`, `<<HORES_CICLES>>`, `<<HORES_FCT>>`, `<<TUT_ESO>>`, `<<TUT_BAT>>`, `<<TUT_FP>>`, `<<CARREC_DIRECTIU>>`, `<<CARREC>>`, `<<REUNIONS>>`, and `<<GUARDIES>>`.
+- `<<HORARI>>` is replaced by the teacher's current effective timetable from `Horaris -> schedule_cache`.
+- Schedule lookup uses the selected `Llista.REDUIT` value against `schedule_cache.effective_teacher_code`; it does not recalculate substitutions or fall back to the source teacher timetable.
+- The timetable has a narrow slot-number column plus `Dilluns`, `Dimarts`, `Dimecres`, `Dijous`, and `Divendres`. It keeps the original slot numbers from 1 to 12 but omits rows where all five weekdays are empty.
+- Entries in the same day and slot are grouped by displayed subject name and classroom. Distinct nonblank groups are joined with commas; blank group and classroom labels are omitted.
+- Schedule entries show the full subject name, falling back to the subject code, with optional `Grup:` and `Classe:` lines. Subject-code categories use the documented orange, blue, pink, yellow, and default green colors from [`teacher-schedule-integration.md`](../../docs/teacher-schedule-integration.md).
+- If a teacher has no effective cache entries, `<<HORARI>>` becomes `No hi ha cap horari efectiu disponible.`
+- The schedule integration reads the registry spreadsheet ID from script property `db`, falling back to this project's existing `Tables` property for compatibility. It resolves `Horaris` in `tables` and reads `schedule_cache` once per export without writing to it.
+- Invalid cache rows whose `day` is outside 1-5 or `slot` is outside 1-12 are excluded and logged. Missing registry configuration, sheets, required headers, or a selected teacher's `REDUIT` stops the export with a clear error.
+- Every grouped timetable item drawn inside one day/slot cell is one one-hour bubble, regardless of how many groups it contains. The summary categories are mutually exclusive, so each bubble contributes to at most one tag.
+- Classification uses the displayed bubble title (`subject_full_name`, falling back to `subject_code`) with case- and accent-insensitive matching. Special categories take precedence over group-based teaching hours in this order: FCT, tutorials, leadership duties, other duties, meetings, guards, and finally stage groups.
+- `<<HORES_ESO>>` counts ordinary bubbles containing any group from `1A` through `4F` for letters A-F.
+- `<<HORES_PFI>>` counts ordinary bubbles containing group `PFI`.
+- `<<HORES_BAT>>` counts ordinary bubbles containing `1BATA`, `1BATB`, `1BATC`, `2BATA`, or `2BATB`.
+- `<<HORES_CICLES>>` counts ordinary bubbles containing `PER1A`, `PER1B`, `PER2A`, `PER2B`, `SMX1`, `SMX2`, `AACC1`, or `AACC2`.
+- `<<HORES_FCT>>` counts bubbles whose title is exactly `FCT`.
+- `<<TUT_ESO>>`, `<<TUT_BAT>>`, and `<<TUT_FP>>` count bubbles titled exactly `TUTORIA` or `TUT_FAMILIES`, according to whether their recognized group belongs to ESO, BAT, or FP. `TUTORIA` with group `ACO` counts as `TUT_ESO`; `TUTORIA` with group `PFI` counts as `TUT_FP`.
+- A groupless `TUT_FAMILIES` bubble inherits the tutorial tag from the same teacher's classified `TUTORIA` bubble. It remains unclassified if that teacher has no classifiable `TUTORIA` or has `TUTORIA` bubbles belonging to different tutorial categories.
+- `<<CARREC_DIRECTIU>>` counts bubbles titled exactly `C.DIR`, `RDIR2`, `RDIR3`, or `REUNIÓ DIRECCIÓ`.
+- `<<CARREC>>` counts remaining bubbles whose title contains `CARREC`, plus exact titles `3R`, `COORDINACIÓ`, `EQUIP CONVIVÈNCIA`, `ORIENTACIÓ`, `REDUCCIO +55`, `RUEC`, and `TREC`.
+- `<<REUNIONS>>` counts remaining bubbles whose title contains `REUNIO`.
+- `<<GUARDIES>>` counts remaining bubbles whose title contains `GUARDIA`, plus exact title `G_PATI_SIEI`.
+- `<<HORES_ESO>>` also counts `Aula acollida` with group `ACO`, exact title `PAEI`, `Sense assignatura` with group `OCU`, and `SIEI` with group `SIEI`.
+- `<<TOTAL>>` is the sum of the twelve mutually exclusive teaching/activity totals. Because every classified bubble contributes to exactly one category, it is also the total number of classified schedule bubbles for that teacher.
+- Group spaces and punctuation are ignored for group comparison. A remaining bubble with no recognized category, or groups from more than one stage, is not counted rather than guessed.
+- `auditAnnualScheduleClassification()` reads all effective teachers from `schedule_cache`, groups the same bubbles used by the DOCX, and returns counts plus every unclassified title/group combination with occurrence and teacher details. It never writes to a spreadsheet.
 - The manifest includes `https://www.googleapis.com/auth/drive` for reading, copying, exporting, and trashing the configured template.
-- After adding this feature, the owner must run `grantAnnualDataPermissions()` once from the Apps Script editor and accept the updated Drive permission. The helper makes a temporary template copy, exports it as DOCX to verify access, and moves the copy to trash in a `finally` block.
+- After adding this feature, the owner must run `grantAnnualDataPermissions()` once from the Apps Script editor. The helper makes a temporary template copy, exports it as DOCX, moves the copy to trash in a `finally` block, and verifies that `Horaris -> schedule_cache` can be read.
 
 ## Apps Script Functions
 
@@ -392,6 +416,7 @@ Expected server-side functions:
 - `saveTeacherDetails(rowNumber, fields)`: writes edited teacher fields back to DB columns A through P.
 - `exportTeachers(rowNumbers)`: returns CSV data for selected teacher rows so the browser can download it.
 - `createAnnualTeacherDataDocx(rowNumbers)`: creates and returns the combined selected-teacher DOCX as base64, then trashes its temporary Google Docs copy.
+- `auditAnnualScheduleClassification()`: audits every effective teacher schedule and reports timetable bubbles that cannot be assigned to exactly one annual-data total.
 - `grantAnnualDataPermissions()`: explicitly grants and verifies template read, Drive copy, DOCX export, and trash permissions without leaving a permanent test file.
 
 Expected client-side export functions:

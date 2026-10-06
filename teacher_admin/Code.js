@@ -1,12 +1,15 @@
 const CONFIG = {
   tablesPropertyName: 'Tables',
+  scheduleRegistryPropertyName: 'db',
   accessGrantedPropertyName: 'access_granted',
   tablesSheetName: 'tables',
   dbRegistryName: 'Dades de professors',
   workloadRegistryName: 'Càrrega lectiva',
+  scheduleRegistryName: 'Horaris',
   dbSheetName: 'Llista',
   workloadProfessorsSheetName: 'professors',
   workloadCarrecsSheetName: 'carrecs',
+  scheduleCacheSheetName: 'schedule_cache',
   leaveAbsenceSheetName: 'leave_absence',
   firstDataRow: 2,
   editableColumnCount: 16,
@@ -55,21 +58,37 @@ const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordproces
 const DOCX_BLANK_FIRST_FOOTER_PATH = 'word/footer-teacher-admin-blank.xml';
 const DOCX_BLANK_FIRST_FOOTER_REL_ID = 'rIdTeacherAdminBlankFirstFooter';
 
-const ANNUAL_DATA_PENDING_TAGS = [
-  'HORARI',
-  'HORES_ESO',
-  'HORES_PFI',
-  'HORES_BAT',
-  'HORES_CICLES',
-  'HORES_FCT',
-  'TUT_ESO',
-  'TUT_BAT',
-  'TUT_FP',
-  'CARREC_DIRECTIU',
-  'CARREC',
-  'REUNIONS',
-  'GUARDIES',
+const ANNUAL_DATA_TOTAL_TAGS = [
+  'HORES_ESO', 'HORES_PFI', 'HORES_BAT', 'HORES_CICLES', 'HORES_FCT',
+  'TUT_ESO', 'TUT_BAT', 'TUT_FP', 'CARREC_DIRECTIU', 'CARREC',
+  'REUNIONS', 'GUARDIES',
 ];
+
+const SCHEDULE_GROUPS = {
+  ESO: [
+    '1A', '1B', '1C', '1D', '1E', '1F',
+    '2A', '2B', '2C', '2D', '2E', '2F',
+    '3A', '3B', '3C', '3D', '3E', '3F',
+    '4A', '4B', '4C', '4D', '4E', '4F',
+  ],
+  PFI: ['PFI'],
+  BAT: ['1BATA', '1BATB', '1BATC', '2BATA', '2BATB'],
+  FP: ['PER1A', 'PER1B', 'PER2A', 'PER2B', 'SMX1', 'SMX2', 'AACC1', 'AACC2'],
+};
+
+const SCHEDULE_DIRECTIVE_TITLES = ['C.DIR', 'RDIR2', 'RDIR3', 'REUNIÓ DIRECCIÓ'];
+
+const SCHEDULE_EXACT_TITLE_TAGS = {
+  '3r': 'CARREC',
+  coordinacio: 'CARREC',
+  equipconvivencia: 'CARREC',
+  orientacio: 'CARREC',
+  reduccio55: 'CARREC',
+  ruec: 'CARREC',
+  trec: 'CARREC',
+  gpatisiei: 'GUARDIES',
+  paei: 'HORES_ESO',
+};
 
 const DB_COLUMNS = [
   { index: 1, key: 'esp', label: 'ESP', type: 'text' },
@@ -114,6 +133,7 @@ function doGet() {
 function grantRequiredPermissions() {
   const properties = PropertiesService.getScriptProperties();
   properties.getProperty(CONFIG.tablesPropertyName);
+  properties.getProperty(CONFIG.scheduleRegistryPropertyName);
   properties.getProperty(CONFIG.accessGrantedPropertyName);
   properties.getProperty(CONFIG.cacheRebuildUrlPropertyName);
   properties.getProperty(CONFIG.cacheRebuildTokenPropertyName);
@@ -126,6 +146,7 @@ function grantRequiredPermissions() {
   const leaveAbsenceSheet = getLeaveAbsenceSheet_();
   const workloadProfessorsSheet = getWorkloadProfessorsSheet_();
   const workloadCarrecsSheet = getWorkloadCarrecsSheet_();
+  const scheduleCacheRows = getScheduleCacheRows_();
 
   dbSheet.getRange(1, 1).getValue();
   leaveAbsenceSheet.getRange(1, 1).getValue();
@@ -151,6 +172,7 @@ function grantRequiredPermissions() {
     leaveAbsenceSheetName: leaveAbsenceSheet.getName(),
     workloadProfessorsSheetName: workloadProfessorsSheet.getName(),
     workloadCarrecsSheetName: workloadCarrecsSheet.getName(),
+    scheduleCacheRows: scheduleCacheRows.length,
     officialScheduleTemplateName: annualDataPermissions.templateName,
     mailRemainingDailyQuota,
   };
@@ -168,7 +190,9 @@ function grantAnnualDataPermissions() {
     );
   }
 
-  return verifyAnnualDataDrivePermissions_(templateId);
+  const result = verifyAnnualDataDrivePermissions_(templateId);
+  result.scheduleCacheRows = getScheduleCacheRows_().length;
+  return result;
 }
 
 function verifyAnnualDataDrivePermissions_(templateId) {
@@ -699,6 +723,7 @@ function createAnnualTeacherDataDocx(rowNumbers) {
       .getDisplayValues()[0];
   });
   const teacherCarrecs = getTeacherCarrecs_();
+  const scheduleCacheRows = getScheduleCacheRows_();
   const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
   const timestamp = Utilities.formatDate(
     new Date(),
@@ -710,12 +735,19 @@ function createAnnualTeacherDataDocx(rowNumbers) {
   try {
     const templateDocx = exportGoogleDocAsDocx_(temporaryFile.getId());
     const outputFileName = `dades-anuals-professorat-${timestamp}.docx`;
-    const mergedDocx = buildAnnualTeacherDataDocx_(
-      templateDocx,
-      teachers.map((teacher) => {
-        return buildAnnualTeacherTagValues_(teacher, teacherCarrecs, today);
-      })
-    );
+    const teacherDocuments = teachers.map((teacher) => {
+      const schedule = buildTeacherSchedule_(teacher, scheduleCacheRows);
+      return {
+        tagValues: buildAnnualTeacherTagValues_(
+          teacher,
+          teacherCarrecs,
+          today,
+          calculateScheduleTotals_(schedule)
+        ),
+        schedule,
+      };
+    });
+    const mergedDocx = buildAnnualTeacherDataDocx_(templateDocx, teacherDocuments);
 
     return {
       fileName: outputFileName,
@@ -764,7 +796,7 @@ function getTeacherCarrecs_() {
   return teacherCarrecs;
 }
 
-function buildAnnualTeacherTagValues_(teacher, teacherCarrecs, today) {
+function buildAnnualTeacherTagValues_(teacher, teacherCarrecs, today, scheduleTotals) {
   const fullName = buildFullName_(teacher);
   const situacio = toDisplayString_(teacher[6]);
   const values = {
@@ -781,11 +813,438 @@ function buildAnnualTeacherTagValues_(teacher, teacherCarrecs, today) {
     DATA: today,
   };
 
-  ANNUAL_DATA_PENDING_TAGS.forEach((tagName) => {
-    values[tagName] = '';
+  ANNUAL_DATA_TOTAL_TAGS.forEach((tagName) => {
+    values[tagName] = String(scheduleTotals[tagName] || 0);
   });
+  values.TOTAL = String(ANNUAL_DATA_TOTAL_TAGS.reduce((sum, tagName) => {
+    return sum + (Number(scheduleTotals[tagName]) || 0);
+  }, 0));
 
   return values;
+}
+
+function getScheduleCacheRows_() {
+  const spreadsheet = getScheduleSpreadsheet_();
+  const sheet = spreadsheet.getSheetByName(CONFIG.scheduleCacheSheetName);
+  if (!sheet) {
+    throw new Error(
+      `No s'ha trobat el full "${CONFIG.scheduleCacheSheetName}" a ${CONFIG.scheduleRegistryName}.`
+    );
+  }
+
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) {
+    throw new Error(`El full "${CONFIG.scheduleCacheSheetName}" esta buit.`);
+  }
+
+  const requiredHeaders = [
+    'row_id',
+    'group',
+    'source_teacher_code',
+    'source_teacher_name',
+    'source_teacher_original_code',
+    'effective_teacher_code',
+    'effective_teacher_name',
+    'teacher_was_substituted',
+    'subject_code',
+    'subject_full_name',
+    'classroom',
+    'day',
+    'slot',
+  ];
+  const headers = values[0].map((value) => toDisplayString_(value));
+  const headerIndexes = new Map();
+  headers.forEach((header, index) => {
+    if (!header) return;
+    if (headerIndexes.has(header)) {
+      throw new Error(
+        `El full "${CONFIG.scheduleCacheSheetName}" te la capcalera duplicada "${header}".`
+      );
+    }
+    headerIndexes.set(header, index);
+  });
+  requiredHeaders.forEach((header) => {
+    if (!headerIndexes.has(header)) {
+      throw new Error(
+        `El full "${CONFIG.scheduleCacheSheetName}" no te la capcalera obligatoria "${header}".`
+      );
+    }
+  });
+
+  return values.slice(1)
+    .filter((row) => row.some((value) => toDisplayString_(value) !== ''))
+    .map((row) => {
+      const record = {};
+      requiredHeaders.forEach((header) => {
+        record[header] = row[headerIndexes.get(header)];
+      });
+      return record;
+    });
+}
+
+function getScheduleSpreadsheet_() {
+  const properties = PropertiesService.getScriptProperties();
+  const registryId = toDisplayString_(
+    properties.getProperty(CONFIG.scheduleRegistryPropertyName)
+  ) || toDisplayString_(properties.getProperty(CONFIG.tablesPropertyName));
+  if (!registryId) {
+    throw new Error(
+      `Falta la propietat de script "${CONFIG.scheduleRegistryPropertyName}" o `
+      + `"${CONFIG.tablesPropertyName}" per llegir els horaris.`
+    );
+  }
+
+  const registrySpreadsheet = SpreadsheetApp.openById(registryId);
+  const registrySheet = registrySpreadsheet.getSheetByName(CONFIG.tablesSheetName);
+  if (!registrySheet) {
+    throw new Error(`No s'ha trobat el full "${CONFIG.tablesSheetName}" al registre d'horaris.`);
+  }
+
+  const lastRow = registrySheet.getLastRow();
+  if (lastRow < 1) {
+    throw new Error(`El full "${CONFIG.tablesSheetName}" del registre d'horaris esta buit.`);
+  }
+
+  const matches = registrySheet
+    .getRange(1, 1, lastRow, 2)
+    .getDisplayValues()
+    .filter((row) => toDisplayString_(row[0]) === CONFIG.scheduleRegistryName);
+  if (matches.length !== 1) {
+    throw new Error(
+      matches.length
+        ? `Hi ha mes d'una entrada "${CONFIG.scheduleRegistryName}" al registre d'horaris.`
+        : `No s'ha trobat "${CONFIG.scheduleRegistryName}" al registre d'horaris.`
+    );
+  }
+
+  const spreadsheetId = toDisplayString_(matches[0][1]);
+  if (!spreadsheetId) {
+    throw new Error(
+      `La fila "${CONFIG.scheduleRegistryName}" no te ID a la columna B.`
+    );
+  }
+  return SpreadsheetApp.openById(spreadsheetId);
+}
+
+function buildTeacherSchedule_(teacher, scheduleCacheRows) {
+  const teacherName = buildFullName_(teacher);
+  const teacherCode = toDisplayString_(teacher[5]);
+  if (!teacherCode) {
+    throw new Error(`El professor "${teacherName}" no te codi REDUIT.`);
+  }
+
+  const codeKey = normalizeText_(teacherCode);
+  const rows = Array.from({ length: 12 }, (_, index) => ({
+    slot: index + 1,
+    cells: Array.from({ length: 5 }, () => ({ items: [], itemIndexes: new Map() })),
+  }));
+
+  scheduleCacheRows.forEach((cacheRow) => {
+    if (normalizeText_(cacheRow.effective_teacher_code) !== codeKey) return;
+
+    const day = Number(cacheRow.day);
+    const slot = Number(cacheRow.slot);
+    if (
+      !Number.isInteger(day) || day < 1 || day > 5
+      || !Number.isInteger(slot) || slot < 1 || slot > 12
+    ) {
+      console.warn(JSON.stringify({
+        event: 'annualTeacherData.invalidScheduleRow',
+        teacherCode,
+        rowId: toDisplayString_(cacheRow.row_id),
+        day: cacheRow.day,
+        slot: cacheRow.slot,
+      }));
+      return;
+    }
+
+    const cell = rows[slot - 1].cells[day - 1];
+    const subjectCode = toDisplayString_(cacheRow.subject_code);
+    const subjectName = toDisplayString_(cacheRow.subject_full_name)
+      || subjectCode
+      || 'Sense assignatura';
+    const classroom = toDisplayString_(cacheRow.classroom);
+    const itemKey = JSON.stringify([subjectName, classroom]);
+    let item = cell.itemIndexes.get(itemKey);
+    if (!item) {
+      item = {
+        subjectName,
+        subjectCode,
+        groups: [],
+        classroom,
+        colour: getScheduleSubjectColour_(subjectCode),
+      };
+      cell.itemIndexes.set(itemKey, item);
+      cell.items.push(item);
+    }
+
+    const group = toDisplayString_(cacheRow.group);
+    if (group && !item.groups.includes(group)) item.groups.push(group);
+  });
+
+  rows.forEach((row) => {
+    row.cells.forEach((cell) => delete cell.itemIndexes);
+  });
+
+  return {
+    teacherCode,
+    teacherName,
+    days: ['Dilluns', 'Dimarts', 'Dimecres', 'Dijous', 'Divendres'],
+    printRows: rows.filter((row) => row.cells.some((cell) => cell.items.length > 0)),
+  };
+}
+
+function getScheduleSubjectColour_(subjectCode) {
+  const code = toDisplayString_(subjectCode).toUpperCase();
+  if (['GUARDIA', 'GUARDIA_PATI'].includes(code)) {
+    return { background: 'FFF4E5', accent: 'F59F00' };
+  }
+  if (['TUT', 'TUT_FAMILIES'].includes(code)) {
+    return { background: 'FFF0F6', accent: 'F06595' };
+  }
+  if (code === '3R') {
+    return { background: 'FFF9DB', accent: 'F2C94C' };
+  }
+  if ([
+    'RC_ESO', 'RC_FP_BAT', 'RDEP', 'RDIM1', 'RDIM2', 'RDIR',
+    'REAP', 'REC', 'CARREC', 'FCT', 'TREC',
+  ].includes(code)) {
+    return { background: 'EEF6FF', accent: '4DABF7' };
+  }
+  return { background: 'EDF7F6', accent: '7FC7BD' };
+}
+
+function calculateScheduleTotals_(schedule) {
+  const totals = {};
+  const context = buildScheduleClassificationContext_(schedule);
+  ANNUAL_DATA_TOTAL_TAGS.forEach((tagName) => {
+    totals[tagName] = 0;
+  });
+
+  schedule.printRows.forEach((row) => {
+    row.cells.forEach((cell) => {
+      cell.items.forEach((item) => {
+        const classification = classifyScheduleItem_(item, context);
+        if (classification.tag) totals[classification.tag] += 1;
+      });
+    });
+  });
+  return totals;
+}
+
+function classifyScheduleItem_(item, context) {
+  const titleKey = normalizeScheduleKey_(item.subjectName);
+  const compactTitle = compactScheduleKey_(item.subjectName);
+  const groupCategories = getScheduleGroupCategories_(item.groups);
+  const groupKeys = item.groups.map(compactScheduleKey_);
+
+  if (SCHEDULE_EXACT_TITLE_TAGS[compactTitle]) {
+    return { tag: SCHEDULE_EXACT_TITLE_TAGS[compactTitle], reason: '' };
+  }
+  if (compactTitle === 'aulaacollida' && groupKeys.includes('aco')) {
+    return { tag: 'HORES_ESO', reason: '' };
+  }
+  if (compactTitle === 'senseassignatura' && groupKeys.includes('ocu')) {
+    return { tag: 'HORES_ESO', reason: '' };
+  }
+  if (compactTitle === 'siei' && groupKeys.includes('siei')) {
+    return { tag: 'HORES_ESO', reason: '' };
+  }
+
+  if (compactTitle === 'fct') {
+    return { tag: 'HORES_FCT', reason: '' };
+  }
+
+  if (compactTitle === 'tutoria' || compactTitle === 'tutfamilies') {
+    const ownTutorialClassification = classifyTutorialGroups_(item, groupCategories);
+    if (ownTutorialClassification.tag) return ownTutorialClassification;
+    if (compactTitle === 'tutfamilies' && context && context.tutorialFallbackTag) {
+      return { tag: context.tutorialFallbackTag, reason: '' };
+    }
+    if (compactTitle === 'tutfamilies' && context && context.tutorialFallbackReason) {
+      return { tag: '', reason: context.tutorialFallbackReason };
+    }
+    return ownTutorialClassification;
+  }
+
+  const directiveTitles = SCHEDULE_DIRECTIVE_TITLES.map(compactScheduleKey_);
+  if (directiveTitles.includes(compactTitle)) {
+    return { tag: 'CARREC_DIRECTIU', reason: '' };
+  }
+  if (titleKey.includes('carrec')) {
+    return { tag: 'CARREC', reason: '' };
+  }
+  if (titleKey.includes('reunio')) {
+    return { tag: 'REUNIONS', reason: '' };
+  }
+  if (titleKey.includes('guardia')) {
+    return { tag: 'GUARDIES', reason: '' };
+  }
+
+  if (groupCategories.length > 1) {
+    return {
+      tag: '',
+      reason: `Grups de categories diferents: ${groupCategories.join(', ')}`,
+    };
+  }
+  if (groupCategories.length === 1) {
+    return {
+      tag: {
+        ESO: 'HORES_ESO',
+        PFI: 'HORES_PFI',
+        BAT: 'HORES_BAT',
+        FP: 'HORES_CICLES',
+      }[groupCategories[0]] || '',
+      reason: '',
+    };
+  }
+
+  return { tag: '', reason: 'Titol i grups fora de les categories configurades' };
+}
+
+function classifyTutorialGroups_(item, groupCategories) {
+  const groupKeys = item.groups.map(compactScheduleKey_);
+  if (groupKeys.includes('aco')) return { tag: 'TUT_ESO', reason: '' };
+  if (groupKeys.includes('pfi')) return { tag: 'TUT_FP', reason: '' };
+  if (groupCategories.length > 1) {
+    return {
+      tag: '',
+      reason: `Tutoria amb grups de categories diferents: ${groupCategories.join(', ')}`,
+    };
+  }
+  if (groupCategories.length === 1) {
+    const tag = {
+      ESO: 'TUT_ESO',
+      BAT: 'TUT_BAT',
+      FP: 'TUT_FP',
+    }[groupCategories[0]];
+    if (tag) return { tag, reason: '' };
+  }
+  return { tag: '', reason: 'Tutoria sense cap grup ESO, BAT o FP reconegut' };
+}
+
+function buildScheduleClassificationContext_(schedule) {
+  const tutorialTags = new Set();
+  schedule.printRows.forEach((row) => {
+    row.cells.forEach((cell) => {
+      cell.items.forEach((item) => {
+        if (compactScheduleKey_(item.subjectName) !== 'tutoria') return;
+        const classification = classifyTutorialGroups_(
+          item,
+          getScheduleGroupCategories_(item.groups)
+        );
+        if (classification.tag) tutorialTags.add(classification.tag);
+      });
+    });
+  });
+
+  if (tutorialTags.size === 1) {
+    return { tutorialFallbackTag: Array.from(tutorialTags)[0], tutorialFallbackReason: '' };
+  }
+  return {
+    tutorialFallbackTag: '',
+    tutorialFallbackReason: tutorialTags.size
+      ? `TUT_FAMILIES amb TUTORIA de categories diferents: ${Array.from(tutorialTags).join(', ')}`
+      : 'TUT_FAMILIES sense cap TUTORIA classificable del mateix professor',
+  };
+}
+
+function getScheduleGroupCategories_(groups) {
+  const categories = new Set();
+  const configuredGroups = {};
+  Object.keys(SCHEDULE_GROUPS).forEach((category) => {
+    SCHEDULE_GROUPS[category].forEach((group) => {
+      configuredGroups[compactScheduleKey_(group)] = category;
+    });
+  });
+  groups.forEach((group) => {
+    const category = configuredGroups[compactScheduleKey_(group)];
+    if (category) categories.add(category);
+  });
+  return Array.from(categories);
+}
+
+function normalizeScheduleKey_(value) {
+  return normalizeText_(value).replace(/\s+/g, ' ');
+}
+
+function compactScheduleKey_(value) {
+  return normalizeScheduleKey_(value).replace(/[^a-z0-9]/g, '');
+}
+
+function auditAnnualScheduleClassification() {
+  const cacheRows = getScheduleCacheRows_();
+  const teachersByCode = new Map();
+  cacheRows.forEach((row) => {
+    const code = toDisplayString_(row.effective_teacher_code);
+    if (!code) return;
+    const codeKey = normalizeText_(code);
+    if (!teachersByCode.has(codeKey)) {
+      teachersByCode.set(codeKey, {
+        code,
+        name: toDisplayString_(row.effective_teacher_name) || code,
+      });
+    }
+  });
+
+  const unclassified = new Map();
+  let bubbleCount = 0;
+  let classifiedBubbleCount = 0;
+  teachersByCode.forEach((teacher) => {
+    const teacherRow = ['', '', teacher.name, '', '', teacher.code];
+    const schedule = buildTeacherSchedule_(teacherRow, cacheRows);
+    const context = buildScheduleClassificationContext_(schedule);
+    schedule.printRows.forEach((row) => {
+      row.cells.forEach((cell) => {
+        cell.items.forEach((item) => {
+          bubbleCount += 1;
+          const classification = classifyScheduleItem_(item, context);
+          if (classification.tag) {
+            classifiedBubbleCount += 1;
+            return;
+          }
+
+          const key = JSON.stringify([
+            normalizeScheduleKey_(item.subjectName),
+            item.groups.map(compactScheduleKey_).sort(),
+            classification.reason,
+          ]);
+          if (!unclassified.has(key)) {
+            unclassified.set(key, {
+              title: item.subjectName,
+              groups: item.groups.slice(),
+              reason: classification.reason,
+              occurrences: 0,
+              teachers: new Set(),
+            });
+          }
+          const record = unclassified.get(key);
+          record.occurrences += 1;
+          record.teachers.add(teacher.name);
+        });
+      });
+    });
+  });
+
+  const unresolved = Array.from(unclassified.values())
+    .map((record) => ({
+      title: record.title,
+      groups: record.groups,
+      reason: record.reason,
+      occurrences: record.occurrences,
+      teacherCount: record.teachers.size,
+      teachers: Array.from(record.teachers).sort(),
+    }))
+    .sort((left, right) => left.title.localeCompare(right.title, 'ca'));
+
+  return {
+    ok: true,
+    teacherCount: teachersByCode.size,
+    bubbleCount,
+    classifiedBubbleCount,
+    unclassifiedBubbleCount: bubbleCount - classifiedBubbleCount,
+    unresolved,
+  };
 }
 
 function exportGoogleDocAsDocx_(fileId) {
@@ -807,8 +1266,8 @@ function exportGoogleDocAsDocx_(fileId) {
   return response.getBlob();
 }
 
-function buildAnnualTeacherDataDocx_(templateDocx, teacherTagValues) {
-  if (!teacherTagValues.length) {
+function buildAnnualTeacherDataDocx_(templateDocx, teacherDocuments) {
+  if (!teacherDocuments.length) {
     throw new Error('Cal seleccionar almenys una fila.');
   }
 
@@ -830,12 +1289,13 @@ function buildAnnualTeacherDataDocx_(templateDocx, teacherTagValues) {
   }
 
   const templateBody = bodyMatch[1];
-  const teacherBodies = teacherTagValues.map((tagValues, index) => {
-    let body = replaceAnnualTeacherTagsInXml_(templateBody, tagValues);
+  const teacherBodies = teacherDocuments.map((teacherDocument, index) => {
+    let body = replaceScheduleTagWithTable_(templateBody, teacherDocument.schedule);
+    body = replaceAnnualTeacherTagsInXml_(body, teacherDocument.tagValues);
     body = removeDocxBookmarks_(body);
     body = forceDocxSectionsToNextPage_(body);
     body = addBlankFirstPageFooterReference_(body);
-    if (index < teacherTagValues.length - 1) {
+    if (index < teacherDocuments.length - 1) {
       body = convertFinalSectionToBreak_(body);
     }
     return body;
@@ -864,6 +1324,128 @@ function buildAnnualTeacherDataDocx_(templateDocx, teacherTagValues) {
   outputEntries.push(createBlankFirstPageFooterBlob_());
 
   return Utilities.zip(outputEntries);
+}
+
+function replaceScheduleTagWithTable_(xml, schedule) {
+  const encodedTag = escapeXmlText_('<<HORARI>>');
+  let replacements = 0;
+  const result = xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (paragraphXml) => {
+    if (!paragraphXml.includes(encodedTag)) return paragraphXml;
+    replacements += 1;
+    return buildScheduleTableXml_(schedule);
+  });
+
+  if (replacements !== 1) {
+    throw new Error(
+      replacements
+        ? 'La plantilla Dades anuals conte mes d\'una etiqueta <<HORARI>>.'
+        : 'No s\'ha trobat l\'etiqueta <<HORARI>> a la plantilla Dades anuals.'
+    );
+  }
+  return result;
+}
+
+function buildScheduleTableXml_(schedule) {
+  if (!schedule.printRows.length) {
+    return '<w:p><w:pPr><w:spacing w:after="0" w:before="0"/></w:pPr>'
+      + '<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>'
+      + '<w:i/><w:color w:val="667085"/><w:sz w:val="16"/></w:rPr>'
+      + '<w:t>No hi ha cap horari efectiu disponible.</w:t></w:r></w:p>';
+  }
+
+  const slotWidth = 400;
+  const dayWidth = 1680;
+  const tableWidth = slotWidth + (dayWidth * schedule.days.length);
+  const grid = [slotWidth, ...schedule.days.map(() => dayWidth)]
+    .map((width) => `<w:gridCol w:w="${width}"/>`)
+    .join('');
+  const headerCells = [
+    buildScheduleHeaderCellXml_('', slotWidth),
+    ...schedule.days.map((day) => buildScheduleHeaderCellXml_(day, dayWidth)),
+  ].join('');
+  const headerRow = '<w:tr><w:trPr><w:tblHeader/><w:cantSplit/></w:trPr>'
+    + headerCells
+    + '</w:tr>';
+  const bodyRows = schedule.printRows.map((row) => {
+    const cells = [
+      buildScheduleSlotCellXml_(row.slot, slotWidth),
+      ...row.cells.map((cell) => buildScheduleDayCellXml_(cell, dayWidth)),
+    ].join('');
+    return `<w:tr><w:trPr><w:cantSplit/></w:trPr>${cells}</w:tr>`;
+  }).join('');
+
+  return '<w:tbl><w:tblPr>'
+    + `<w:tblW w:w="${tableWidth}" w:type="dxa"/>`
+    + '<w:jc w:val="center"/><w:tblLayout w:type="fixed"/>'
+    + '<w:tblBorders>'
+    + '<w:top w:val="single" w:sz="4" w:color="D8DEE8"/>'
+    + '<w:left w:val="single" w:sz="4" w:color="D8DEE8"/>'
+    + '<w:bottom w:val="single" w:sz="4" w:color="D8DEE8"/>'
+    + '<w:right w:val="single" w:sz="4" w:color="D8DEE8"/>'
+    + '<w:insideH w:val="single" w:sz="4" w:color="D8DEE8"/>'
+    + '<w:insideV w:val="single" w:sz="4" w:color="D8DEE8"/>'
+    + '</w:tblBorders>'
+    + '<w:tblCellMar><w:top w:w="40" w:type="dxa"/>'
+    + '<w:left w:w="40" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/>'
+    + '<w:right w:w="40" w:type="dxa"/></w:tblCellMar>'
+    + '</w:tblPr>'
+    + `<w:tblGrid>${grid}</w:tblGrid>${headerRow}${bodyRows}</w:tbl>`;
+}
+
+function buildScheduleHeaderCellXml_(text, width) {
+  return '<w:tc><w:tcPr>'
+    + `<w:tcW w:w="${width}" w:type="dxa"/>`
+    + '<w:shd w:val="clear" w:fill="E9EEF5"/><w:vAlign w:val="center"/>'
+    + '</w:tcPr><w:p><w:pPr><w:jc w:val="center"/>'
+    + '<w:spacing w:before="0" w:after="0"/></w:pPr>'
+    + '<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>'
+    + '<w:b/><w:color w:val="344054"/><w:sz w:val="15"/></w:rPr>'
+    + `<w:t>${escapeXmlText_(text)}</w:t></w:r></w:p></w:tc>`;
+}
+
+function buildScheduleSlotCellXml_(slot, width) {
+  return '<w:tc><w:tcPr>'
+    + `<w:tcW w:w="${width}" w:type="dxa"/>`
+    + '<w:shd w:val="clear" w:fill="F8FAFC"/><w:vAlign w:val="center"/>'
+    + '</w:tcPr><w:p><w:pPr><w:jc w:val="center"/>'
+    + '<w:spacing w:before="0" w:after="0"/></w:pPr>'
+    + '<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>'
+    + '<w:b/><w:color w:val="344054"/><w:sz w:val="14"/></w:rPr>'
+    + `<w:t>${slot}</w:t></w:r></w:p></w:tc>`;
+}
+
+function buildScheduleDayCellXml_(cell, width) {
+  const content = cell.items.length
+    ? cell.items.map(buildScheduleItemParagraphXml_).join('')
+    : '<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>';
+  return '<w:tc><w:tcPr>'
+    + `<w:tcW w:w="${width}" w:type="dxa"/>`
+    + '<w:vAlign w:val="center"/></w:tcPr>'
+    + `${content}</w:tc>`;
+}
+
+function buildScheduleItemParagraphXml_(item) {
+  const subject = escapeXmlText_(item.subjectName);
+  const metaLines = [];
+  if (item.groups.length) metaLines.push(`Grup: ${item.groups.join(', ')}`);
+  if (item.classroom) metaLines.push(`Classe: ${item.classroom}`);
+  const metaRuns = metaLines.map((line) => {
+    return '<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>'
+      + '<w:color w:val="344054"/><w:sz w:val="13"/></w:rPr>'
+      + `<w:br/><w:t>${escapeXmlText_(line)}</w:t></w:r>`;
+  }).join('');
+
+  return '<w:p><w:pPr>'
+    + '<w:keepLines/><w:spacing w:before="20" w:after="20" w:line="160" w:lineRule="atLeast"/>'
+    + '<w:jc w:val="left"/>'
+    + '<w:ind w:left="50" w:right="25"/>'
+    + '<w:pBdr>'
+    + `<w:left w:val="single" w:sz="18" w:space="3" w:color="${item.colour.accent}"/>`
+    + '</w:pBdr>'
+    + `<w:shd w:val="clear" w:fill="${item.colour.background}"/>`
+    + '</w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>'
+    + '<w:b/><w:color w:val="134E4A"/><w:sz w:val="14"/></w:rPr>'
+    + `<w:t>${subject}</w:t></w:r>${metaRuns}</w:p>`;
 }
 
 function replaceAnnualTeacherTagsInXml_(xml, tagValues) {

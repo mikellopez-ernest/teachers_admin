@@ -81,7 +81,8 @@ The DB spreadsheet also has a `leave_absence` sheet with `row_id`, `teacher_code
 - The signature list includes only selected teachers, sorted by first surname, with columns for teacher name, signature, and observations.
 - `Full signatures vagues` includes only selected teachers in the same order and row height as the signature list, with columns for teacher, entry time, signature, exit time, and signature.
 - `Etiquetes` creates a selected-teacher PDF with two columns and fifteen rows per page, with each teacher name centered in its cell as uppercase `COGNOM1 COGNOM2, NOM`.
-- `Dades anuals` fills the official two-page Google Docs template for every selected teacher, concatenates all forms into one DOCX, downloads it locally, and trashes the temporary Drive copy.
+- `Dades anuals` fills the official Google Docs template for every selected teacher, draws the current effective timetable from `Horaris -> schedule_cache` in `<<HORARI>>`, calculates the mutually exclusive teaching/activity totals and `<<TOTAL>>` from those same timetable bubbles, concatenates all forms into one DOCX, downloads it locally, and trashes the temporary Drive copy.
+- `auditAnnualScheduleClassification()` provides a read-only Apps Script editor diagnostic of timetable bubbles that cannot be assigned to one annual-data total.
 - Rows with `SUBST?` checked are shown in slight green; leave-of-absence rows are shown in slight red.
 - Action buttons warn if no row is selected.
 - `BAIXA?` is read-only in the teacher edit form and is only changed through the leave workflow.
@@ -92,7 +93,7 @@ This project is connected to Apps Script with `clasp`.
 
 After installing the project or adding OAuth scopes, run `grantRequiredPermissions()` once from the Apps Script editor and accept the authorization prompt. The helper grants the services used by the app, including spreadsheet access, Drive template access, external HTTP requests, user identity, script properties, and email sending. Its mail check uses `MailApp.getRemainingDailyQuota()` and does not send a test message.
 
-For the `Dades anuals` export specifically, `grantAnnualDataPermissions()` verifies the complete Drive workflow by making a temporary template copy, exporting it as DOCX, and immediately moving the test copy to trash. Run it once from the Apps Script editor after deploying a version that adds or changes Drive scopes.
+For the `Dades anuals` export specifically, `grantAnnualDataPermissions()` verifies the complete Drive workflow by making a temporary template copy, exporting it as DOCX, immediately moving the test copy to trash, and reading `Horaris -> schedule_cache`. Run it once from the Apps Script editor after deploying this version or a version that changes Drive scopes.
 
 The PDF exports are generated in the browser with jsPDF and jsPDF AutoTable loaded from CDN by `Index.html`.
 
@@ -101,6 +102,7 @@ Detailed behavior is specified in [`docs/SPECS.md`](docs/SPECS.md).
 ## Script Properties
 
 - `Tables`: required registry spreadsheet ID.
+- `db`: optional preferred registry spreadsheet ID for the `Dades anuals` timetable integration. If absent, the app reuses `Tables`; the selected registry's `tables` sheet must contain the `Horaris` spreadsheet ID.
 - `access_granted`: comma-separated list of allowed càrrecs and/or direct emails.
 - `cache_rebuild_token`: required token sent in the JSON POST payload to the Horaris cache rebuild endpoint after starting or ending a leave.
 - `cache_rebuild_url`: optional override for the Horaris cache rebuild endpoint. If omitted, the app uses `https://script.google.com/macros/s/AKfycbyhSqCTkS27bDxsfILI64rlSMUTN5A7VbHGgpSf_G6efxrWfOuUKJULnN2rlMtHuWqwmA/exec`.
