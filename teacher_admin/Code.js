@@ -139,9 +139,9 @@ function grantRequiredPermissions() {
   });
 
   const mailRemainingDailyQuota = MailApp.getRemainingDailyQuota();
-  const officialScheduleTemplateName = officialScheduleTemplateId
-    ? DriveApp.getFileById(officialScheduleTemplateId).getName()
-    : '';
+  const annualDataPermissions = officialScheduleTemplateId
+    ? verifyAnnualDataDrivePermissions_(officialScheduleTemplateId)
+    : { templateName: '' };
 
   return {
     ok: true,
@@ -151,9 +151,58 @@ function grantRequiredPermissions() {
     leaveAbsenceSheetName: leaveAbsenceSheet.getName(),
     workloadProfessorsSheetName: workloadProfessorsSheet.getName(),
     workloadCarrecsSheetName: workloadCarrecsSheet.getName(),
-    officialScheduleTemplateName,
+    officialScheduleTemplateName: annualDataPermissions.templateName,
     mailRemainingDailyQuota,
   };
+}
+
+function grantAnnualDataPermissions() {
+  const templateId = toDisplayString_(
+    PropertiesService.getScriptProperties()
+      .getProperty(CONFIG.officialScheduleTeachersDocIdPropertyName)
+  );
+
+  if (!templateId) {
+    throw new Error(
+      `Falta la propietat de script "${CONFIG.officialScheduleTeachersDocIdPropertyName}".`
+    );
+  }
+
+  return verifyAnnualDataDrivePermissions_(templateId);
+}
+
+function verifyAnnualDataDrivePermissions_(templateId) {
+  const templateFile = DriveApp.getFileById(templateId);
+  if (templateFile.getMimeType() !== MimeType.GOOGLE_DOCS) {
+    throw new Error('El document configurat per a Dades anuals no es un document de Google.');
+  }
+
+  const timestamp = Utilities.formatDate(
+    new Date(),
+    Session.getScriptTimeZone(),
+    'yyyyMMdd-HHmmss'
+  );
+  let temporaryFile = null;
+
+  try {
+    temporaryFile = templateFile.makeCopy(`teacher-admin-permission-check-${timestamp}`);
+    const exportedFile = exportGoogleDocAsDocx_(temporaryFile.getId());
+    if (!exportedFile.getBytes().length) {
+      throw new Error('La comprovacio de permisos ha generat un DOCX buit.');
+    }
+
+    return {
+      ok: true,
+      message: 'Permisos de Dades anuals concedits i comprovats correctament.',
+      templateName: templateFile.getName(),
+      exportedBytes: exportedFile.getBytes().length,
+      temporaryCopyTrashed: true,
+    };
+  } finally {
+    if (temporaryFile) {
+      temporaryFile.setTrashed(true);
+    }
+  }
 }
 
 function assertUserAccess_() {

@@ -374,7 +374,7 @@ Salut,
 - `<<DATA>>` is the generation date formatted as `dd/MM/yyyy` in the script timezone.
 - These deferred tags are replaced with blanks: `<<HORARI>>`, `<<HORES_ESO>>`, `<<HORES_PFI>>`, `<<HORES_BAT>>`, `<<HORES_CICLES>>`, `<<HORES_FCT>>`, `<<TUT_ESO>>`, `<<TUT_BAT>>`, `<<TUT_FP>>`, `<<CARREC_DIRECTIU>>`, `<<CARREC>>`, `<<REUNIONS>>`, and `<<GUARDIES>>`.
 - The manifest includes `https://www.googleapis.com/auth/drive` for reading, copying, exporting, and trashing the configured template.
-- After adding this feature, the owner must run `grantRequiredPermissions()` once and accept the updated Drive permission.
+- After adding this feature, the owner must run `grantAnnualDataPermissions()` once from the Apps Script editor and accept the updated Drive permission. The helper makes a temporary template copy, exports it as DOCX to verify access, and moves the copy to trash in a `finally` block.
 
 ## Apps Script Functions
 
@@ -392,6 +392,7 @@ Expected server-side functions:
 - `saveTeacherDetails(rowNumber, fields)`: writes edited teacher fields back to DB columns A through P.
 - `exportTeachers(rowNumbers)`: returns CSV data for selected teacher rows so the browser can download it.
 - `createAnnualTeacherDataDocx(rowNumbers)`: creates and returns the combined selected-teacher DOCX as base64, then trashes its temporary Google Docs copy.
+- `grantAnnualDataPermissions()`: explicitly grants and verifies template read, Drive copy, DOCX export, and trash permissions without leaving a permanent test file.
 
 Expected client-side export functions:
 

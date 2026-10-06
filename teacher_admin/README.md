@@ -92,6 +92,8 @@ This project is connected to Apps Script with `clasp`.
 
 After installing the project or adding OAuth scopes, run `grantRequiredPermissions()` once from the Apps Script editor and accept the authorization prompt. The helper grants the services used by the app, including spreadsheet access, Drive template access, external HTTP requests, user identity, script properties, and email sending. Its mail check uses `MailApp.getRemainingDailyQuota()` and does not send a test message.
 
+For the `Dades anuals` export specifically, `grantAnnualDataPermissions()` verifies the complete Drive workflow by making a temporary template copy, exporting it as DOCX, and immediately moving the test copy to trash. Run it once from the Apps Script editor after deploying a version that adds or changes Drive scopes.
+
 The PDF exports are generated in the browser with jsPDF and jsPDF AutoTable loaded from CDN by `Index.html`.
 
 Detailed behavior is specified in [`docs/SPECS.md`](docs/SPECS.md).
