@@ -82,7 +82,6 @@ const SCHEDULE_EXACT_TITLE_TAGS = {
   '3r': 'CARREC',
   coordinacio: 'CARREC',
   equipconvivencia: 'CARREC',
-  orientacio: 'CARREC',
   reduccio55: 'CARREC',
   ruec: 'CARREC',
   trec: 'CARREC',
@@ -1037,6 +1036,17 @@ function classifyScheduleItem_(item, context) {
   const compactTitle = compactScheduleKey_(item.subjectName);
   const groupCategories = getScheduleGroupCategories_(item.groups);
   const groupKeys = item.groups.map(compactScheduleKey_);
+
+  if (compactTitle === 'orientacio') {
+    const hasGroup = item.groups.length > 0;
+    const hasClassroom = Boolean(toDisplayString_(item.classroom));
+    if (!hasGroup && !hasClassroom) return { tag: 'CARREC', reason: '' };
+    if (hasGroup && hasClassroom) return { tag: 'HORES_ESO', reason: '' };
+    return {
+      tag: '',
+      reason: 'ORIENTACIÓ ha de tenir grup i classe, o no tenir-ne cap dels dos',
+    };
+  }
 
   if (SCHEDULE_EXACT_TITLE_TAGS[compactTitle]) {
     return { tag: SCHEDULE_EXACT_TITLE_TAGS[compactTitle], reason: '' };

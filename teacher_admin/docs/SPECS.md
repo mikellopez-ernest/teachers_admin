@@ -390,7 +390,8 @@ Salut,
 - `<<TUT_ESO>>`, `<<TUT_BAT>>`, and `<<TUT_FP>>` count bubbles titled exactly `TUTORIA` or `TUT_FAMILIES`, according to whether their recognized group belongs to ESO, BAT, or FP. `TUTORIA` with group `ACO` counts as `TUT_ESO`; `TUTORIA` with group `PFI` counts as `TUT_FP`.
 - A groupless `TUT_FAMILIES` bubble inherits the tutorial tag from the same teacher's classified `TUTORIA` bubble. It remains unclassified if that teacher has no classifiable `TUTORIA` or has `TUTORIA` bubbles belonging to different tutorial categories.
 - `<<CARREC_DIRECTIU>>` counts bubbles titled exactly `C.DIR`, `RDIR2`, `RDIR3`, or `REUNIÓ DIRECCIÓ`.
-- `<<CARREC>>` counts remaining bubbles whose title contains `CARREC`, plus exact titles `3R`, `COORDINACIÓ`, `EQUIP CONVIVÈNCIA`, `ORIENTACIÓ`, `REDUCCIO +55`, `RUEC`, and `TREC`.
+- `ORIENTACIÓ` is classified from the bubble contents: with neither `Grup` nor `Classe`, it counts as `<<CARREC>>`; with both `Grup` and `Classe`, it counts as `<<HORES_ESO>>`. If exactly one of those fields is present, the bubble remains unclassified for diagnosis.
+- `<<CARREC>>` counts remaining bubbles whose title contains `CARREC`, plus exact titles `3R`, `COORDINACIÓ`, `EQUIP CONVIVÈNCIA`, `REDUCCIO +55`, `RUEC`, and `TREC`.
 - `<<REUNIONS>>` counts remaining bubbles whose title contains `REUNIO`.
 - `<<GUARDIES>>` counts remaining bubbles whose title contains `GUARDIA`, plus exact title `G_PATI_SIEI`.
 - `<<HORES_ESO>>` also counts `Aula acollida` with group `ACO`, exact title `PAEI`, `Sense assignatura` with group `OCU`, and `SIEI` with group `SIEI`.
